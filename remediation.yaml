@@ -1,1 +1,5 @@
-
+methods:
+  - method: org.joychou.controller.XSS.encode:java.lang.String(java.lang.String)
+    tags:
+      - key: category
+        value: Cross-Site Scripting
