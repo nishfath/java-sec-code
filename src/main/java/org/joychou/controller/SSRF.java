@@ -27,39 +27,6 @@ public class SSRF {
 
 
     /**
-     * http://localhost:8080/ssrf/urlConnection/vuln?url=file:///etc/passwd
-     *
-     * The default setting of followRedirects is true.
-     * Protocol: file ftp mailto http https jar netdoc
-     * UserAgent is Java/1.8.0_102.
-     */
-    @RequestMapping(value = "/urlConnection/vuln", method = {RequestMethod.POST, RequestMethod.GET})
-    public String URLConnectionVuln(String url) {
-        return HttpUtils.URLConnection(url);
-    }
-
-
-    @GetMapping("/urlConnection/sec")
-    public String URLConnectionSec(String url) {
-
-        // Decline not http/https protocol
-        if (!SecurityUtil.isHttp(url)) {
-            return "[-] SSRF check failed";
-        }
-
-        try {
-            SecurityUtil.startSSRFHook();
-            return HttpUtils.URLConnection(url);
-        } catch (SSRFException | IOException e) {
-            return e.getMessage();
-        } finally {
-            SecurityUtil.stopSSRFHook();
-        }
-
-    }
-
-
-    /**
      * The default setting of followRedirects is true.
      * UserAgent is Java/1.8.0_102.
      */
