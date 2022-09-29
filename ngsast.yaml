@@ -1,11 +1,17 @@
 ngsast:
 - app:
-    name: helloshiftleft-spring-app
+    name: java-sec-code
     additional-findings:
-    - hsl-secrets
+    - reduce-sev
     policy: io.shiftleft/helloshiftleft
     language: JAVA
 additional-findings:
-  hsl-secrets:
-    entropy: 0.5
-    name: secrets
+   reduce-sev:
+    filter:
+         severity: 
+           - High
+         category:
+           - Sensitive Data Leak
+       tags:
+         - key: severity
+           value: Low
