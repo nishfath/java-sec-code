@@ -18,3 +18,11 @@ finding-modifications:
        tags:
          - key: severity
            value: medium
+       filter:
+         severity: 
+           - high
+         category:
+           - Sensitive Data Leak
+       tags:
+         - key: severity
+           value: low
