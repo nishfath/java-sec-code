@@ -1,4 +1,4 @@
-inspect:
+ngsast:
   - app:
       language: JAVA
       name: java-sec-code
