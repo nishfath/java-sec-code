@@ -1,4 +1,4 @@
-ngsast:
+inspect:
   - app:
       language: JAVA
       name: java-sec-code
@@ -12,17 +12,9 @@ finding-modifications:
     # Use filter to specify the category
        filter:
          severity: 
-           - critical
-         category:
-           - SQL Injection
-       tags:
-         - key: severity
-           value: medium
-       filter:
-         severity: 
            - high
          category:
            - Sensitive Data Leak
-       tags:
-         - key: severity
-           value: low
+         tags:
+           - key: severity
+             value: low
