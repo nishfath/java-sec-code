@@ -1,9 +1,9 @@
 ngsast:
 - app:
-    name: helloshiftleft-spring-app
+    name: java-sec-code
     additional-findings:
     - hsl-secrets
-    policy: io.shiftleft/helloshiftleft
+    policy: io.shiftleft/java-sec-code
     language: JAVA
 additional-findings:
   hsl-secrets:
