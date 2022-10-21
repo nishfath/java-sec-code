@@ -6,7 +6,7 @@ build_rules:
       - critical
       - high
     threshold: 0
-    - id: "Allow 0 secrets"
+  - id: "Allow 0 secrets"
     finding_types:
       - secret
     threshold: 0  
