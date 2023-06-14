@@ -31,6 +31,15 @@ build_rules:
     threshold: 0
     options:
       num_findings: 10 # Return 10 container findings
+  - id: "Allow no license violations"
+    finding types:
+      - license
+    licenses:
+      - allow:
+        - Apache-2.0, Public-Domain, Unknown
+      - block:
+        - MIT
+    threshold: 0
 # The above rule is perhaps the most common in that it
 # is designed to be used with Pull Request and to block
 # new vulns from being introduced that aren't already on
