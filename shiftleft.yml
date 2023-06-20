@@ -6,13 +6,13 @@ build_rules:
       - critical
       - high
     threshold: 0
-    - id: "Allow 0 secrets"
+ - id: "Allow 0 secrets"
     finding_types:
       - secret
     threshold: 0  
     options:
       num_findings: 10 # Return 10 sast findings
-  - id: "No reachable SCA findings"
+ - id: "No reachable SCA findings"
     finding_types:
       - oss_vuln
     cvss_31_severity_ratings:
@@ -22,7 +22,7 @@ build_rules:
     options:
       reachable: true
       num_findings: 10 # Return 10 reachable sca findings
-  - id: "No critical or high container findings"
+- id: "No critical or high container findings"
     finding_types:
       - container
     cvss_31_severity_ratings:
@@ -31,7 +31,7 @@ build_rules:
     threshold: 0
     options:
       num_findings: 10 # Return 10 container findings
-  - id: "Allow no license violations"
+- id: "Allow no license violations"
     finding types:
       - license
     licenses:
