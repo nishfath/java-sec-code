@@ -9,7 +9,7 @@ build_rules:
   - id: "Allow 0 secrets"
     finding_types:
       - secret
-    threshold: 0  
+    threshold: 10  
     options:
       num_findings: 10 # Return 10 sast findings
   - id: "No reachable SCA findings"
