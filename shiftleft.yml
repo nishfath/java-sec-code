@@ -2,10 +2,10 @@ build_rules:
   - id: "No critical or high SAST findings"
      finding_types:
        - vuln
-    cvss_31_severity_ratings:
-      - critical
-      - high
-    threshold: 0
+     cvss_31_severity_ratings:
+       - critical
+       - high
+     threshold: 0
  - id: "Allow 0 secrets"
     finding_types:
       - secret
