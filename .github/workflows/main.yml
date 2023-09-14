@@ -39,7 +39,7 @@ jobs:
       run: ${GITHUB_WORKSPACE}/sl analyze --wait --app java-sec-code-test --tag branch=${{ github.head_ref || steps.extract_branch.outputs.branch }} --vcs-prefix-correction "*=/src/main/java" --java ./target/java-sec-code-1.0.0.jar
       env:
         SHIFTLEFT_ACCESS_TOKEN: ${{ secrets.SHIFTLEFT_ACCESS_TOKEN }}
-        - name: Validate Build Rules
+    - name: Validate Build Rules
       run: |
         ${GITHUB_WORKSPACE}/sl check-analysis --v2 --app java-sec-code-test \
             --report \
