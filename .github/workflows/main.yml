@@ -41,7 +41,7 @@ jobs:
         SHIFTLEFT_ACCESS_TOKEN: ${{ secrets.SHIFTLEFT_ACCESS_TOKEN }}
     - name: Validate Build Rules
       run: |
-        ${GITHUB_WORKSPACE}/sl check-analysis --v2 --app java-sec-code-test \
+        ${GITHUB_WORKSPACE}/sl check-analysis --v2 --app java-sec-code-test --config ~/shiftleft.yml \
             --report \
             --github-pr-number=${{github.event.number}} \
             --github-pr-user=${{ github.repository_owner }} \
