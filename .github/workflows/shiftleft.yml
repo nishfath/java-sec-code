@@ -42,7 +42,7 @@ jobs:
         
     - name: Validate Build Rules
       run: |
-        ${GITHUB_WORKSPACE}/sl check-analysis --v2 --app java-sec-code \
+        ${GITHUB_WORKSPACE}/sl check-analysis --v2 --app java-sec-code --config ~/shiftleft.yml \
             --report \
             --github-pr-number=${{github.event.number}} \
             --github-pr-user=${{ github.repository_owner }} \
