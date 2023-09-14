@@ -36,9 +36,9 @@ build_rules:
       - license
     licenses:
       - allow:
-        - Apache-2.0, Public-Domain, Unknown
+        - Apache-2.0, Public-Domain
       - block:
-        - MIT
+        - Unknown
     threshold: 0
 # The above rule is perhaps the most common in that it
 # is designed to be used with Pull Request and to block
