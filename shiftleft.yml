@@ -8,7 +8,7 @@ build_rules:
     threshold: 0
  - id: "Allow 0 secrets"
     finding_types:
-      - secret
+      - secrets
     threshold: 0  
     options:
       num_findings: 10 # Return 10 sast findings
