@@ -221,6 +221,73 @@ private boolean isInRange(int min, int max, String value) {
     }
 }
 
+        // Validate URL before processing
+        if (!isValidUrl(url)) {
+            return "Invalid URL format or disallowed domain";
+        }
+        
+        SecurityUtil.startSSRFHook();
+        HttpUtils.imageIO(url);
+    } catch (SSRFException | IOException e) {
+        return e.getMessage();
+    } finally {
+        SecurityUtil.stopSSRFHook();
+    }
+
+    return "ImageIO ssrf test";
+}
+
+// Helper method to validate URLs
+private boolean isValidUrl(String url) {
+    try {
+        // Validate URL format
+        URL u = new URL(url);
+        
+        // Whitelist approach - only allow specific domains
+        List<String> allowedDomains = new ArrayList<>();
+        allowedDomains.add("example.com");
+        allowedDomains.add("trusted-domain.com");
+        // Add more trusted domains as needed
+        
+        String host = u.getHost().toLowerCase();
+        
+        // Check if domain is in the whitelist
+        for (String domain : allowedDomains) {
+            if (host.equals(domain) || host.endsWith("." + domain)) {
+                return true;
+            }
+        }
+        
+        // Disallow private/internal IP addresses
+        String ip = u.getHost();
+        if (isPrivateIPAddress(ip)) {
+            return false;
+        }
+        
+        return false;  // Reject by default if not in whitelist
+    } catch (MalformedURLException e) {
+        return false;
+    }
+}
+
+private boolean isPrivateIPAddress(String host) {
+    // Check for common private IP address ranges
+    return host.startsWith("10.") || 
+           host.startsWith("192.168.") || 
+           host.startsWith("172.") && isInRange(16, 31, host.split("\\.")[1]) ||
+           host.equals("localhost") ||
+           host.equals("127.0.0.1");
+}
+
+private boolean isInRange(int min, int max, String value) {
+    try {
+        int val = Integer.parseInt(value);
+        return val >= min && val <= max;
+    } catch (NumberFormatException e) {
+        return false;
+    }
+}
+
             SecurityUtil.startSSRFHook();
             HttpUtils.imageIO(url);
         } catch (SSRFException | IOException e) {
