@@ -70,33 +70,79 @@ public class SSRF {
      * new URL(String url).openStream()
      * new URL(String url).getContent()
      */
-    @GetMapping("/openStream")
-    public void openStream(@RequestParam String url, HttpServletResponse response) throws IOException {
-        InputStream inputStream = null;
-        OutputStream outputStream = null;
-        try {
-            String downLoadImgFileName = WebUtils.getNameWithoutExtension(url) + "." + WebUtils.getFileExtension(url);
-            // download
-            response.setHeader("content-disposition", "attachment;fileName=" + downLoadImgFileName);
+@GetMapping("/openStream")
+public void openStream(@RequestParam String url, HttpServletResponse response) throws IOException {
+    InputStream inputStream = null;
+    OutputStream outputStream = null;
+    try {
+        // Validate URL to prevent SSRF
+        UrlValidator urlValidator = new UrlValidator(new String[]{"http", "https"});
+        if (!urlValidator.isValid(url)) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().write("Invalid URL provided");
+            return;
+        }
+        
+        // Validate URL host to prevent accessing internal resources
+        URL u = new URL(url);
+        String host = u.getHost();
+        // Block access to private networks and localhost
+        if (isPrivateAddress(host)) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.getWriter().write("Access to internal resources is not allowed");
+            return;
+        }
 
-            URL u = new URL(url);
-            int length;
-            byte[] bytes = new byte[1024];
-            inputStream = u.openStream(); // send request
-            outputStream = response.getOutputStream();
-            while ((length = inputStream.read(bytes)) > 0) {
-                outputStream.write(bytes, 0, length);
-            }
+        // Sanitize and get filename
+        String downLoadImgFileName = WebUtils.getNameWithoutExtension(url) + "." + WebUtils.getFileExtension(url);
+        
+        // Set content-disposition header with proper filename encoding
+        response.setHeader("content-disposition", "attachment;fileName=" + 
+                           java.net.URLEncoder.encode(downLoadImgFileName, "UTF-8"));
 
-        } catch (Exception e) {
-            logger.error(e.toString());
-        } finally {
-            if (inputStream != null) {
-                inputStream.close();
-            }
-            if (outputStream != null) {
-                outputStream.close();
-            }
+        int length;
+        byte[] bytes = new byte[1024];
+        inputStream = u.openStream(); // send request
+        outputStream = response.getOutputStream();
+        while ((length = inputStream.read(bytes)) > 0) {
+            outputStream.write(bytes, 0, length);
+        }
+
+    } catch (Exception e) {
+        logger.error(e.toString());
+        response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+    } finally {
+        if (inputStream != null) {
+            inputStream.close();
+        }
+        if (outputStream != null) {
+            outputStream.close();
+        }
+    }
+}
+
+// Helper method to check if an address is private
+private boolean isPrivateAddress(String host) {
+    if (host.equalsIgnoreCase("localhost") || host.equals("127.0.0.1") || host.startsWith("192.168.") ||
+        host.startsWith("10.") || host.matches("172\\.(1[6-9]|2[0-9]|3[0-1])\\..*")) {
+        return true;
+    }
+    return false;
+}
+
+
+    } catch (Exception e) {
+        logger.error(e.toString());
+    } finally {
+        if (inputStream != null) {
+            inputStream.close();
+        }
+        if (outputStream != null) {
+            outputStream.close();
+        }
+    }
+}
+
         }
     }
 
@@ -105,9 +151,143 @@ public class SSRF {
      * The default setting of followRedirects is true.
      * UserAgent is Java/1.8.0_102.
      */
-    @GetMapping("/ImageIO/sec")
-    public String ImageIO(@RequestParam String url) {
-        try {
+@GetMapping("/ImageIO/sec")
+public String ImageIO(@RequestParam String url) {
+    try {
+        // Validate URL before processing
+        if (!isValidUrl(url)) {
+            return "Invalid URL format or disallowed domain";
+        }
+        
+        SecurityUtil.startSSRFHook();
+        HttpUtils.imageIO(url);
+    } catch (SSRFException | IOException e) {
+        return e.getMessage();
+    } finally {
+        SecurityUtil.stopSSRFHook();
+    }
+
+    return "ImageIO ssrf test";
+}
+
+// Helper method to validate URLs
+private boolean isValidUrl(String url) {
+    try {
+        // Validate URL format
+        URL u = new URL(url);
+        
+        // Whitelist approach - only allow specific domains
+        List<String> allowedDomains = new ArrayList<>();
+        allowedDomains.add("example.com");
+        allowedDomains.add("trusted-domain.com");
+        // Add more trusted domains as needed
+        
+        String host = u.getHost().toLowerCase();
+        
+        // Check if domain is in the whitelist
+        for (String domain : allowedDomains) {
+            if (host.equals(domain) || host.endsWith("." + domain)) {
+                return true;
+            }
+        }
+        
+        // Disallow private/internal IP addresses
+        String ip = u.getHost();
+        if (isPrivateIPAddress(ip)) {
+            return false;
+        }
+        
+        return false;  // Reject by default if not in whitelist
+    } catch (MalformedURLException e) {
+        return false;
+    }
+}
+
+private boolean isPrivateIPAddress(String host) {
+    // Check for common private IP address ranges
+    return host.startsWith("10.") || 
+           host.startsWith("192.168.") || 
+           host.startsWith("172.") && isInRange(16, 31, host.split("\\.")[1]) ||
+           host.equals("localhost") ||
+           host.equals("127.0.0.1");
+}
+
+private boolean isInRange(int min, int max, String value) {
+    try {
+        int val = Integer.parseInt(value);
+        return val >= min && val <= max;
+    } catch (NumberFormatException e) {
+        return false;
+    }
+}
+
+        // Validate URL before processing
+        if (!isValidUrl(url)) {
+            return "Invalid URL format or disallowed domain";
+        }
+        
+        SecurityUtil.startSSRFHook();
+        HttpUtils.imageIO(url);
+    } catch (SSRFException | IOException e) {
+        return e.getMessage();
+    } finally {
+        SecurityUtil.stopSSRFHook();
+    }
+
+    return "ImageIO ssrf test";
+}
+
+// Helper method to validate URLs
+private boolean isValidUrl(String url) {
+    try {
+        // Validate URL format
+        URL u = new URL(url);
+        
+        // Whitelist approach - only allow specific domains
+        List<String> allowedDomains = new ArrayList<>();
+        allowedDomains.add("example.com");
+        allowedDomains.add("trusted-domain.com");
+        // Add more trusted domains as needed
+        
+        String host = u.getHost().toLowerCase();
+        
+        // Check if domain is in the whitelist
+        for (String domain : allowedDomains) {
+            if (host.equals(domain) || host.endsWith("." + domain)) {
+                return true;
+            }
+        }
+        
+        // Disallow private/internal IP addresses
+        String ip = u.getHost();
+        if (isPrivateIPAddress(ip)) {
+            return false;
+        }
+        
+        return false;  // Reject by default if not in whitelist
+    } catch (MalformedURLException e) {
+        return false;
+    }
+}
+
+private boolean isPrivateIPAddress(String host) {
+    // Check for common private IP address ranges
+    return host.startsWith("10.") || 
+           host.startsWith("192.168.") || 
+           host.startsWith("172.") && isInRange(16, 31, host.split("\\.")[1]) ||
+           host.equals("localhost") ||
+           host.equals("127.0.0.1");
+}
+
+private boolean isInRange(int min, int max, String value) {
+    try {
+        int val = Integer.parseInt(value);
+        return val >= min && val <= max;
+    } catch (NumberFormatException e) {
+        return false;
+    }
+}
+
             SecurityUtil.startSSRFHook();
             HttpUtils.imageIO(url);
         } catch (SSRFException | IOException e) {

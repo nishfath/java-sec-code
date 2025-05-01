@@ -25,31 +25,57 @@ import java.io.InputStreamReader;
 @RequestMapping("/rce")
 public class Rce {
 
-    @GetMapping("/runtime/exec")
-    public String CommandExec(String cmd) {
-        Runtime run = Runtime.getRuntime();
-        StringBuilder sb = new StringBuilder();
-
-        try {
-            Process p = run.exec(cmd);
-            BufferedInputStream in = new BufferedInputStream(p.getInputStream());
-            BufferedReader inBr = new BufferedReader(new InputStreamReader(in));
-            String tmpStr;
-
-            while ((tmpStr = inBr.readLine()) != null) {
-                sb.append(tmpStr);
-            }
-
-            if (p.waitFor() != 0) {
-                if (p.exitValue() == 1)
-                    return "Command exec failed!!";
-            }
-
-            inBr.close();
-            in.close();
-        } catch (Exception e) {
-            return e.toString();
+@GetMapping("/runtime/exec")
+public String CommandExec(String cmd) {
+    // Input validation - reject empty or null commands
+    if (StringUtils.isBlank(cmd)) {
+        return "Command cannot be empty";
+    }
+    
+    // Define a whitelist of allowed commands
+    List<String> allowedCommands = Arrays.asList("ls", "dir", "date", "whoami");
+    
+    // Extract the base command (first word before any arguments)
+    String baseCommand = cmd.trim().split("\\s+")[0];
+    
+    // Check if the command is in the whitelist
+    if (!allowedCommands.contains(baseCommand)) {
+        return "Command not allowed for security reasons";
+    }
+    
+    // Use ProcessBuilder instead of Runtime.exec for better security
+    // and to avoid command injection through shell interpretation
+    List<String> commandWithArgs = new ArrayList<>();
+    for (String part : cmd.trim().split("\\s+")) {
+        commandWithArgs.add(part);
+    }
+    
+    StringBuilder sb = new StringBuilder();
+    try {
+        ProcessBuilder processBuilder = new ProcessBuilder(commandWithArgs);
+        // Merge error and output streams
+        processBuilder.redirectErrorStream(true);
+        
+        Process p = processBuilder.start();
+        BufferedReader inBr = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String tmpStr;
+        
+        while ((tmpStr = inBr.readLine()) != null) {
+            sb.append(tmpStr).append("\n");
         }
+        
+        if (p.waitFor() != 0) {
+            if (p.exitValue() == 1)
+                return "Command exec failed!!";
+        }
+        
+        inBr.close();
+    } catch (Exception e) {
+        return "Error: " + e.toString();
+    }
+    return sb.toString();
+}
+
         return sb.toString();
     }
 
