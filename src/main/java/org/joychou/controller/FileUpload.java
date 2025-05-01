@@ -109,38 +109,45 @@ public String singleFileUpload(@RequestParam("file") MultipartFile file,
             return "Please select a file to upload";
         }
 
-        String originalFilename = multifile.getOriginalFilename();
-        // Extract file extension safely
-        String suffix = FilenameUtils.getExtension(originalFilename);
-        if (suffix == null || suffix.isEmpty()) {
-            return "Upload failed. File has no extension.";
+        String originalFileName = multifile.getOriginalFilename();
+        if (originalFileName == null) {
+            return "Invalid filename";
         }
-        suffix = "." + suffix.toLowerCase();
         
-        String mimeType = multifile.getContentType(); // Get MIME type
+        // Extract just the base name of the file without path information
+        String safeFileName = FilenameUtils.getName(originalFileName);
         
-        // Generate a safe random filename with original extension
-        String safeFilename = UUID.randomUUID().toString() + suffix;
-        String filePath = UPLOADED_FOLDER + safeFilename;
+        // If the filename was malicious and resulted in an empty string after sanitization
+        if (safeFileName.isEmpty()) {
+            return "Invalid filename";
+        }
         
+        String Suffix = FilenameUtils.getExtension(safeFileName);
+        if (Suffix.isEmpty()) {
+            return "File must have an extension";
+        }
+        Suffix = "." + Suffix.toLowerCase();
+        
+        String mimeType = multifile.getContentType(); // 获取MIME类型
+        String filePath = UPLOADED_FOLDER + safeFileName;
         File excelFile = convert(multifile);
 
-        // Validate file extension is in whitelist (validation 1)
+        // 判断文件后缀名是否在白名单内  校验1
         String[] picSuffixList = {".jpg", ".png", ".jpeg", ".gif", ".bmp", ".ico"};
         boolean suffixFlag = false;
         for (String white_suffix : picSuffixList) {
-            if (suffix.equals(white_suffix)) {
+            if (Suffix.toLowerCase().equals(white_suffix)) {
                 suffixFlag = true;
                 break;
             }
         }
         if (!suffixFlag) {
-            logger.error("[-] Suffix error: " + suffix);
+            logger.error("[-] Suffix error: " + Suffix);
             deleteFile(filePath);
-            return "Upload failed. Illegal picture format.";
+            return "Upload failed. Illeagl picture.";
         }
 
-        // Check MIME type against blacklist (validation 2)
+        // 判断MIME类型是否在黑名单内 校验2
         String[] mimeTypeBlackList = {
                 "text/html",
                 "text/javascript",
@@ -150,12 +157,50 @@ public String singleFileUpload(@RequestParam("file") MultipartFile file,
                 "application/xml"
         };
         for (String blackMimeType : mimeTypeBlackList) {
-            // Using contains to prevent bypass like text/html;charset=UTF-8
+            // 用contains是为了防止text/html;charset=UTF-8绕过
             if (SecurityUtil.replaceSpecialStr(mimeType).toLowerCase().contains(blackMimeType)) {
                 logger.error("[-] Mime type error: " + mimeType);
                 deleteFile(filePath);
-                return "Upload failed. Illegal picture.";
+                return "Upload failed. Illeagl picture.";
             }
+        }
+
+        // 判断文件内容是否是图片 校验3
+        boolean isImageFlag = isImage(excelFile);
+        deleteFile(randomFilePath);
+
+        if (!isImageFlag) {
+            logger.error("[-] File is not Image");
+            deleteFile(filePath);
+            return "Upload failed. Illeagl picture.";
+        }
+
+        try {
+            // Generate a secure unique filename instead of using original name
+            String secureFileName = UUID.randomUUID().toString() + Suffix;
+            
+            // Get the file and save it somewhere
+            byte[] bytes = multifile.getBytes();
+            Path path = Paths.get(UPLOADED_FOLDER).resolve(secureFileName);
+            
+            // Ensure the resolved path is within the intended directory
+            if (!path.normalize().startsWith(Paths.get(UPLOADED_FOLDER).normalize())) {
+                return "Security constraint violation";
+            }
+            
+            Files.write(path, bytes);
+            filePath = path.toString(); // Update filePath with the actual path used
+        } catch (IOException e) {
+            logger.error(e.toString());
+            deleteFile(filePath);
+            return "Upload failed";
+        }
+
+        logger.info("[+] Safe file. Suffix: null, MIME: null", Suffix, mimeType);
+        logger.info("[+] Successfully uploaded null", filePath);
+        return String.format("You successfully uploaded '%s'", filePath);
+    }
+
         }
 
         // Validate file content is an image (validation 3)
@@ -229,17 +274,43 @@ public String singleFileUpload(@RequestParam("file") MultipartFile file,
      * 不建议使用transferTo，因为原始的MultipartFile会被覆盖
      * https://stackoverflow.com/questions/24339990/how-to-convert-a-multipart-file-to-file
      */
-    private File convert(MultipartFile multiFile) throws Exception {
-        String fileName = multiFile.getOriginalFilename();
-        String suffix = fileName.substring(fileName.lastIndexOf("."));
+private File convert(MultipartFile multiFile) throws Exception {
+        String originalFileName = multiFile.getOriginalFilename();
+        if (originalFileName == null) {
+            throw new IllegalArgumentException("Original filename cannot be null");
+        }
+        
+        // Extract just the extension safely
+        String extension = FilenameUtils.getExtension(originalFileName);
+        if (extension.isEmpty()) {
+            extension = "bin"; // Default extension if none is found
+        }
+        String suffix = "." + extension.toLowerCase();
+        
         UUID uuid = Generators.timeBasedGenerator().generate();
-        randomFilePath = UPLOADED_FOLDER + uuid + suffix;
-        // 随机生成一个同后缀名的文件
-        File convFile = new File(randomFilePath);
+        randomFilePath = UPLOADED_FOLDER + uuid.toString() + suffix;
+        
+        // Create file path securely
+        Path resolvedPath = Paths.get(UPLOADED_FOLDER).normalize().resolve(uuid.toString() + suffix).normalize();
+        
+        // Verify the resolved path is still within the upload directory
+        if (!resolvedPath.startsWith(Paths.get(UPLOADED_FOLDER).normalize())) {
+            throw new SecurityException("Path traversal attempt detected");
+        }
+        
+        // Create the file using the secure path
+        File convFile = resolvedPath.toFile();
         boolean ret = convFile.createNewFile();
         if (!ret) {
             return null;
         }
+        
+        FileOutputStream fos = new FileOutputStream(convFile);
+        fos.write(multiFile.getBytes());
+        fos.close();
+        return convFile;
+    }
+
         FileOutputStream fos = new FileOutputStream(convFile);
         fos.write(multiFile.getBytes());
         fos.close();
