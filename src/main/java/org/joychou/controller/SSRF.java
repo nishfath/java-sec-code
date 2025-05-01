@@ -75,27 +75,31 @@ public void openStream(@RequestParam String url, HttpServletResponse response) t
     InputStream inputStream = null;
     OutputStream outputStream = null;
     try {
-        // Validate URL format and protocol to prevent SSRF
-        URI uri = new URI(url);
-        String protocol = uri.getScheme();
-        // Only allow http and https protocols
-        if (!"http".equalsIgnoreCase(protocol) && !"https".equalsIgnoreCase(protocol)) {
-            throw new IllegalArgumentException("Invalid protocol: only HTTP and HTTPS are allowed");
-        }
-
-        // Get filename without path traversal vulnerabilities
-        String filename = FilenameUtils.getName(uri.getPath());
-        if (filename == null || filename.isEmpty()) {
-            filename = "downloaded_file";
+        // Validate URL to prevent SSRF
+        UrlValidator urlValidator = new UrlValidator(new String[]{"http", "https"});
+        if (!urlValidator.isValid(url)) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().write("Invalid URL provided");
+            return;
         }
         
-        String extension = WebUtils.getFileExtension(url);
-        String downLoadImgFileName = WebUtils.getNameWithoutExtension(url) + "." + extension;
-        
-        // Set response headers with sanitized filename
-        response.setHeader("content-disposition", "attachment;fileName=" + downLoadImgFileName);
-
+        // Validate URL host to prevent accessing internal resources
         URL u = new URL(url);
+        String host = u.getHost();
+        // Block access to private networks and localhost
+        if (isPrivateAddress(host)) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.getWriter().write("Access to internal resources is not allowed");
+            return;
+        }
+
+        // Sanitize and get filename
+        String downLoadImgFileName = WebUtils.getNameWithoutExtension(url) + "." + WebUtils.getFileExtension(url);
+        
+        // Set content-disposition header with proper filename encoding
+        response.setHeader("content-disposition", "attachment;fileName=" + 
+                           java.net.URLEncoder.encode(downLoadImgFileName, "UTF-8"));
+
         int length;
         byte[] bytes = new byte[1024];
         inputStream = u.openStream(); // send request
@@ -103,6 +107,29 @@ public void openStream(@RequestParam String url, HttpServletResponse response) t
         while ((length = inputStream.read(bytes)) > 0) {
             outputStream.write(bytes, 0, length);
         }
+
+    } catch (Exception e) {
+        logger.error(e.toString());
+        response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+    } finally {
+        if (inputStream != null) {
+            inputStream.close();
+        }
+        if (outputStream != null) {
+            outputStream.close();
+        }
+    }
+}
+
+// Helper method to check if an address is private
+private boolean isPrivateAddress(String host) {
+    if (host.equalsIgnoreCase("localhost") || host.equals("127.0.0.1") || host.startsWith("192.168.") ||
+        host.startsWith("10.") || host.matches("172\\.(1[6-9]|2[0-9]|3[0-1])\\..*")) {
+        return true;
+    }
+    return false;
+}
+
 
     } catch (Exception e) {
         logger.error(e.toString());
