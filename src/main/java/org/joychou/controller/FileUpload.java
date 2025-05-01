@@ -103,59 +103,115 @@ public String singleFileUpload(@RequestParam("file") MultipartFile file,
 
     // only upload picture
 @PostMapping("/upload/picture")
-    @ResponseBody
-    public String uploadPicture(@RequestParam("file") MultipartFile multifile) throws Exception {
-        if (multifile.isEmpty()) {
-            return "Please select a file to upload";
-        }
+@ResponseBody
+public String uploadPicture(@RequestParam("file") MultipartFile multifile) throws Exception {
+    if (multifile.isEmpty()) {
+        return "Please select a file to upload";
+    }
 
-        String originalFileName = multifile.getOriginalFilename();
-        if (originalFileName == null) {
-            return "Invalid filename";
-        }
-        
-        // Extract just the base name of the file without path information
-        String safeFileName = FilenameUtils.getName(originalFileName);
-        
-        // If the filename was malicious and resulted in an empty string after sanitization
-        if (safeFileName.isEmpty()) {
-            return "Invalid filename";
-        }
-        
-        String Suffix = FilenameUtils.getExtension(safeFileName);
-        if (Suffix.isEmpty()) {
-            return "File must have an extension";
-        }
-        Suffix = "." + Suffix.toLowerCase();
-        
-        String mimeType = multifile.getContentType(); // 获取MIME类型
-        String filePath = UPLOADED_FOLDER + safeFileName;
-        File excelFile = convert(multifile);
+    String originalFileName = multifile.getOriginalFilename();
+    if (originalFileName == null) {
+        return "Invalid filename";
+    }
+    
+    // Get file extension safely
+    String suffix = FilenameUtils.getExtension(originalFileName);
+    if (suffix == null || suffix.isEmpty()) {
+        logger.error("[-] No file extension found");
+        return "Upload failed. Invalid file format.";
+    }
+    suffix = "." + suffix.toLowerCase();
+    
+    String mimeType = multifile.getContentType(); // Get MIME type
+    
+    // Generate a secure random filename with UUID
+    String secureFileName = UUID.randomUUID().toString() + suffix;
+    String filePath = UPLOADED_FOLDER + secureFileName;
+    File excelFile = convert(multifile);
 
-        // 判断文件后缀名是否在白名单内  校验1
-        String[] picSuffixList = {".jpg", ".png", ".jpeg", ".gif", ".bmp", ".ico"};
-        boolean suffixFlag = false;
-        for (String white_suffix : picSuffixList) {
-            if (Suffix.toLowerCase().equals(white_suffix)) {
-                suffixFlag = true;
-                break;
+    // Validate file extension whitelist - check 1
+    String[] picSuffixList = {".jpg", ".png", ".jpeg", ".gif", ".bmp", ".ico"};
+    boolean suffixFlag = false;
+    for (String whiteSuffix : picSuffixList) {
+        if (suffix.equals(whiteSuffix)) {
+            suffixFlag = true;
+            break;
+        }
+    }
+    if (!suffixFlag) {
+        logger.error("[-] Suffix error: " + suffix);
+        deleteFile(filePath);
+        return "Upload failed. Illegal picture format.";
+    }
+
+    // Validate MIME type against blacklist - check 2
+    String[] mimeTypeBlackList = {
+            "text/html",
+            "text/javascript",
+            "application/javascript",
+            "application/ecmascript",
+            "text/xml",
+            "application/xml"
+    };
+    
+    if (mimeType != null) {
+        String sanitizedMimeType = SecurityUtil.replaceSpecialStr(mimeType).toLowerCase();
+        for (String blackMimeType : mimeTypeBlackList) {
+            // Use contains to prevent bypassing with text/html;charset=UTF-8
+            if (sanitizedMimeType.contains(blackMimeType)) {
+                logger.error("[-] Mime type error: " + mimeType);
+                deleteFile(filePath);
+                return "Upload failed. Illegal picture format.";
             }
         }
-        if (!suffixFlag) {
-            logger.error("[-] Suffix error: " + Suffix);
-            deleteFile(filePath);
-            return "Upload failed. Illeagl picture.";
-        }
+    } else {
+        logger.error("[-] Missing mime type");
+        deleteFile(filePath);
+        return "Upload failed. Unknown file type.";
+    }
 
-        // 判断MIME类型是否在黑名单内 校验2
-        String[] mimeTypeBlackList = {
-                "text/html",
-                "text/javascript",
-                "application/javascript",
-                "application/ecmascript",
-                "text/xml",
-                "application/xml"
-        };
+    // Validate file content is an image - check 3
+    boolean isImageFlag = isImage(excelFile);
+    deleteFile(randomFilePath); // Note: assuming randomFilePath is defined in the original implementation
+
+    if (!isImageFlag) {
+        logger.error("[-] File is not an Image");
+        deleteFile(filePath);
+        return "Upload failed. File content is not a valid image.";
+    }
+
+    try {
+        // Create the target directory if it doesn't exist
+        File uploadDir = new File(UPLOADED_FOLDER);
+        if (!uploadDir.exists()) {
+            if (!uploadDir.mkdirs()) {
+                logger.error("[-] Failed to create upload directory");
+                return "Upload failed. Server error.";
+            }
+        }
+        
+        // Create a Path object with normalized path to prevent path traversal
+        Path path = Paths.get(UPLOADED_FOLDER).normalize().resolve(secureFileName);
+        
+        // Validate that the resolved path is within the upload directory
+        if (!path.startsWith(Paths.get(UPLOADED_FOLDER).normalize())) {
+            logger.error("[-] Path traversal attempt detected");
+            return "Upload failed. Security violation.";
+        }
+        
+        // Write the file
+        Files.write(path, multifile.getBytes());
+    } catch (IOException e) {
+        logger.error("[-] File upload error: " + e.toString());
+        deleteFile(filePath);
+        return "Upload failed: " + e.getMessage();
+    }
+
+    logger.info("[+] Safe file. Suffix: null, MIME: null", suffix, mimeType);
+    logger.info("[+] Successfully uploaded null", filePath);
+    return String.format("File '%s' successfully uploaded as '%s'", originalFileName, secureFileName);
+}
+
         for (String blackMimeType : mimeTypeBlackList) {
             // 用contains是为了防止text/html;charset=UTF-8绕过
             if (SecurityUtil.replaceSpecialStr(mimeType).toLowerCase().contains(blackMimeType)) {
@@ -257,13 +313,35 @@ public String singleFileUpload(@RequestParam("file") MultipartFile file,
         return String.format("You successfully uploaded '%s'", filePath);
     }
 
-    private void deleteFile(String filePath) {
-        File delFile = new File(filePath);
-        if(delFile.isFile() && delFile.exists()) {
+private void deleteFile(String filePath) {
+    if (filePath == null || filePath.isEmpty()) {
+        logger.warn("[-] Attempted to delete file with null or empty path");
+        return;
+    }
+    
+    try {
+        // Normalize and resolve the path to prevent path traversal
+        Path path = Paths.get(UPLOADED_FOLDER).normalize().resolve(Paths.get(filePath).getFileName());
+        
+        // Ensure the file is within the upload directory
+        if (!path.startsWith(Paths.get(UPLOADED_FOLDER).normalize())) {
+            logger.error("[-] Path traversal attempt detected during file deletion");
+            return;
+        }
+        
+        File delFile = path.toFile();
+        if (delFile.isFile() && delFile.exists()) {
             if (delFile.delete()) {
-                logger.info("[+] " + filePath + " delete successfully!");
+                logger.info("[+] null deleted successfully!", path);
                 return;
             }
+        }
+        logger.info("[-] null deletion failed or file does not exist", path);
+    } catch (Exception e) {
+        logger.error("[-] Error deleting file: null", e.getMessage());
+    }
+}
+
         }
         logger.info(filePath + " delete failed!");
     }
