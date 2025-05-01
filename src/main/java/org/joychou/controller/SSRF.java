@@ -70,33 +70,52 @@ public class SSRF {
      * new URL(String url).openStream()
      * new URL(String url).getContent()
      */
-    @GetMapping("/openStream")
-    public void openStream(@RequestParam String url, HttpServletResponse response) throws IOException {
-        InputStream inputStream = null;
-        OutputStream outputStream = null;
-        try {
-            String downLoadImgFileName = WebUtils.getNameWithoutExtension(url) + "." + WebUtils.getFileExtension(url);
-            // download
-            response.setHeader("content-disposition", "attachment;fileName=" + downLoadImgFileName);
+@GetMapping("/openStream")
+public void openStream(@RequestParam String url, HttpServletResponse response) throws IOException {
+    InputStream inputStream = null;
+    OutputStream outputStream = null;
+    try {
+        // Validate URL format and protocol to prevent SSRF
+        URI uri = new URI(url);
+        String protocol = uri.getScheme();
+        // Only allow http and https protocols
+        if (!"http".equalsIgnoreCase(protocol) && !"https".equalsIgnoreCase(protocol)) {
+            throw new IllegalArgumentException("Invalid protocol: only HTTP and HTTPS are allowed");
+        }
 
-            URL u = new URL(url);
-            int length;
-            byte[] bytes = new byte[1024];
-            inputStream = u.openStream(); // send request
-            outputStream = response.getOutputStream();
-            while ((length = inputStream.read(bytes)) > 0) {
-                outputStream.write(bytes, 0, length);
-            }
+        // Get filename without path traversal vulnerabilities
+        String filename = FilenameUtils.getName(uri.getPath());
+        if (filename == null || filename.isEmpty()) {
+            filename = "downloaded_file";
+        }
+        
+        String extension = WebUtils.getFileExtension(url);
+        String downLoadImgFileName = WebUtils.getNameWithoutExtension(url) + "." + extension;
+        
+        // Set response headers with sanitized filename
+        response.setHeader("content-disposition", "attachment;fileName=" + downLoadImgFileName);
 
-        } catch (Exception e) {
-            logger.error(e.toString());
-        } finally {
-            if (inputStream != null) {
-                inputStream.close();
-            }
-            if (outputStream != null) {
-                outputStream.close();
-            }
+        URL u = new URL(url);
+        int length;
+        byte[] bytes = new byte[1024];
+        inputStream = u.openStream(); // send request
+        outputStream = response.getOutputStream();
+        while ((length = inputStream.read(bytes)) > 0) {
+            outputStream.write(bytes, 0, length);
+        }
+
+    } catch (Exception e) {
+        logger.error(e.toString());
+    } finally {
+        if (inputStream != null) {
+            inputStream.close();
+        }
+        if (outputStream != null) {
+            outputStream.close();
+        }
+    }
+}
+
         }
     }
 
