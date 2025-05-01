@@ -165,13 +165,24 @@ public class HttpUtils {
     }
 
 
-    public static void imageIO(String url) {
-        try {
-            URL u = new URL(url);
-            ImageIO.read(u); // send request
-        } catch (IOException e) {
-            logger.error(e.getMessage());
-        }
+public static void imageIO(String url) {
+    try {
+        // Create URL object with validated URL
+        URL u = new URL(url);
+        
+        // Set connection timeout to prevent hanging
+        System.setProperty("sun.net.client.defaultConnectTimeout", "5000");
+        System.setProperty("sun.net.client.defaultReadTimeout", "5000");
+        
+        // Send request with proper error handling
+        ImageIO.read(u);
+    } catch (IOException e) {
+        logger.error("Error during ImageIO operation: null", e.getMessage());
+        // Don't expose full exception details to prevent information leakage
+        throw new IOException("Image processing failed");
+    }
+}
+
 
     }
 
