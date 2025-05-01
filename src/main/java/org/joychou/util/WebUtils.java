@@ -35,12 +35,21 @@ public class WebUtils {
     }
 
 
-    public static String getFileExtension(String fullName) {
-        Preconditions.checkNotNull(fullName);
-        String fileName = (new File(fullName)).getName();
-        int dotIndex = fileName.lastIndexOf('.');
-        return dotIndex == -1 ? "" : fileName.substring(dotIndex + 1);
+public static String getFileExtension(String fullName) {
+    Preconditions.checkNotNull(fullName);
+    
+    // Don't create File object directly from user input
+    // Instead, extract the extension safely using FilenameUtils
+    try {
+        URI uri = new URI(fullName);
+        String path = uri.getPath();
+        return FilenameUtils.getExtension(path);
+    } catch (URISyntaxException e) {
+        // If not a valid URI, try to extract extension safely
+        return FilenameUtils.getExtension(fullName);
     }
+}
+
 
 
     public static String getNameWithoutExtension(String file) {
