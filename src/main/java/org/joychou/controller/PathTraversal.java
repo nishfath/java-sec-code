@@ -27,27 +27,47 @@ public String getImage(String filepath) throws IOException {
 }
 
 
-    @GetMapping("/path_traversal/sec")
-    public String getImageSec(String filepath) throws IOException {
-        if (SecurityUtil.pathFilter(filepath) == null) {
-            logger.info("Illegal file path: " + filepath);
-            return "Bad boy. Illegal file path.";
-        }
+@GetMapping("/path_traversal/sec")
+public String getImageSec(String filepath) throws IOException {
+    // Apply strict validation and normalization to prevent directory traversal
+    String sanitizedPath = sanitizeFilePath(filepath);
+    if (sanitizedPath == null) {
+        logger.info("Illegal file path: " + filepath);
+        return "Bad boy. Illegal file path.";
+    }
+    return getImgBase64(sanitizedPath);
+}
+
         return getImgBase64(filepath);
     }
 
 private String getImgBase64(String imgFile) throws IOException {
     logger.info("Working directory: " + System.getProperty("user.dir"));
-    logger.info("Requested file path: " + imgFile);
-    
-    // Define a base directory for images to restrict access to only this directory
-    String baseDir = System.getProperty("user.dir") + File.separator + "images";
-    
+    logger.info("File path: " + imgFile);
+
+    File f = new File(imgFile);
     try {
-        // Canonicalize both paths to resolve any ".." or "." segments
-        File baseDirectory = new File(baseDir).getCanonicalFile();
-        File requestedFile = new File(baseDirectory, imgFile).getCanonicalFile();
+        // Additional security check to ensure file is within allowed directory
+        String canonicalPath = f.getCanonicalPath();
+        String baseDir = new File(getBaseImageDirectory()).getCanonicalPath();
         
+        if (!canonicalPath.startsWith(baseDir)) {
+            logger.warn("Attempted directory traversal attack: " + imgFile);
+            return "Access denied: Invalid file location.";
+        }
+        
+        if (f.exists() && !f.isDirectory()) {
+            byte[] data = Files.readAllBytes(Paths.get(imgFile));
+            return new String(Base64.encodeBase64(data));
+        } else {
+            return "File doesn't exist or is not a file.";
+        }
+    } catch (IOException e) {
+        logger.error("Error processing file: " + e.getMessage());
+        return "Error processing file.";
+    }
+}
+
         // Verify the requested file is within the allowed base directory
         if (!requestedFile.toPath().startsWith(baseDirectory.toPath())) {
             logger.warn("Path traversal attempt detected: " + imgFile);
