@@ -52,12 +52,19 @@ public static String getFileExtension(String fullName) {
 
 
 
-    public static String getNameWithoutExtension(String file) {
-        Preconditions.checkNotNull(file);
-        String fileName = (new File(file)).getName();
-        int dotIndex = fileName.lastIndexOf('.');
-        return dotIndex == -1 ? fileName : fileName.substring(0, dotIndex);
-    }
+public static String getNameWithoutExtension(String file) {
+    Preconditions.checkNotNull(file);
+    
+    // Only use the last part of the path to avoid directory traversal
+    String fileName = Paths.get(file).getFileName().toString();
+    
+    // Sanitize the filename to prevent directory traversal
+    fileName = fileName.replaceAll("[/\\\\]", "");
+    
+    int dotIndex = fileName.lastIndexOf('.');
+    return dotIndex == -1 ? fileName : fileName.substring(0, dotIndex);
+}
+
 
 
 }
