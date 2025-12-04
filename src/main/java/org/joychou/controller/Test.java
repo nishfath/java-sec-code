@@ -24,13 +24,14 @@ public class Test {
     }
 
 
-    @RequestMapping(value = "/aa")
-    public void test(HttpServletResponse response, String empId) {
+@RequestMapping(value = "/aa")
+public void test(HttpServletResponse response, String empId) {
+    System.out.println(empId);
+    Cookie cookie = new Cookie("XSRF-TOKEN", "123");
+    cookie.setDomain("taobao.com");
+    cookie.setMaxAge(-1); // forever time
+    cookie.setHttpOnly(true); // Set HttpOnly flag to prevent client-side script access
+    response.addCookie(cookie);
+}
 
-        System.out.println(empId);
-        Cookie cookie = new Cookie("XSRF-TOKEN", "123");
-        cookie.setDomain("taobao.com");
-        cookie.setMaxAge(-1); // forever time
-        response.addCookie(cookie);
-    }
 }
