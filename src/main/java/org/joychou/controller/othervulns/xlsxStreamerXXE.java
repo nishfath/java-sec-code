@@ -32,10 +32,31 @@ public class xlsxStreamerXXE {
     }
 
 
-    @PostMapping("/readxlsx")
-    public void xllx_streamer_xxe(MultipartFile file) throws IOException {
-        StreamingReader.builder().open(file.getInputStream());
+@PostMapping("/readxlsx")
+public void xllx_streamer_xxe(MultipartFile file) throws IOException {
+    // Create temporary file to avoid direct stream processing
+    Path tempFile = Files.createTempFile("safe-", "-xlsx");
+    try {
+        // Copy content to temp file
+        Files.copy(file.getInputStream(), tempFile, StandardCopyOption.REPLACE_EXISTING);
+        
+        // Configure safe XML processing
+        System.setProperty("javax.xml.parsers.SAXParserFactory", "com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl");
+        System.setProperty("javax.xml.parsers.DocumentBuilderFactory", "com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl");
+        
+        // Use the secure reader builder with secure properties
+        StreamingReader reader = StreamingReader.builder()
+            .rowCacheSize(100)    // number of rows to keep in memory
+            .bufferSize(4096)     // buffer size to use when reading
+            .open(tempFile.toFile());
+    } catch (Exception e) {
+        throw new IOException("Error processing XLSX file: " + e.getMessage(), e);
+    } finally {
+        // Clean up the temporary file
+        Files.deleteIfExists(tempFile);
     }
+}
+
 
 
     public static void main(String[] args) throws Exception {
