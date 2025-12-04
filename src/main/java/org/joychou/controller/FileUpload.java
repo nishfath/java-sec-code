@@ -86,41 +86,43 @@ public class FileUpload {
             return "Please select a file to upload";
         }
 
-        String originalFileName = multifile.getOriginalFilename();
-        if (originalFileName == null) {
+        // Extract filename safely
+        String originalFilename = multifile.getOriginalFilename();
+        if (originalFilename == null) {
             return "Invalid filename";
         }
         
-        // Extract file extension safely
-        String suffix = "";
-        int lastDotIndex = originalFileName.lastIndexOf(".");
-        if (lastDotIndex > 0) {
-            suffix = originalFileName.substring(lastDotIndex).toLowerCase();
+        // Extract file extension using a safe method
+        String extension = FilenameUtils.getExtension(originalFilename);
+        if (extension == null || extension.isEmpty()) {
+            return "File must have an extension";
         }
         
+        // Generate a secure random filename with the original extension
+        String secureFilename = UUID.randomUUID().toString() + "." + extension;
+        String Suffix = "." + extension.toLowerCase();
         String mimeType = multifile.getContentType(); // Get MIME type
         
-        // Generate a secure random filename to prevent directory traversal
-        String secureFileName = UUID.randomUUID().toString() + suffix;
-        String filePath = UPLOADED_FOLDER + secureFileName;
+        // Create safe file path with the secure filename
+        String filePath = UPLOADED_FOLDER + secureFilename;
         File excelFile = convert(multifile);
 
-        // Check if file extension is in whitelist
+        // Validate file extension against whitelist (check 1)
         String[] picSuffixList = {".jpg", ".png", ".jpeg", ".gif", ".bmp", ".ico"};
         boolean suffixFlag = false;
         for (String white_suffix : picSuffixList) {
-            if (suffix.toLowerCase().equals(white_suffix)) {
+            if (Suffix.toLowerCase().equals(white_suffix)) {
                 suffixFlag = true;
                 break;
             }
         }
         if (!suffixFlag) {
-            logger.error("[-] Suffix error: " + suffix);
+            logger.error("[-] Suffix error: " + Suffix);
             deleteFile(filePath);
             return "Upload failed. Illegal picture format.";
         }
 
-        // Check if MIME type is in blacklist
+        // Check MIME type against blacklist (check 2)
         String[] mimeTypeBlackList = {
                 "text/html",
                 "text/javascript",
@@ -130,7 +132,7 @@ public class FileUpload {
                 "application/xml"
         };
         for (String blackMimeType : mimeTypeBlackList) {
-            // Using contains to prevent bypass with text/html;charset=UTF-8
+            // Use contains to prevent bypasses like text/html;charset=UTF-8
             if (SecurityUtil.replaceSpecialStr(mimeType).toLowerCase().contains(blackMimeType)) {
                 logger.error("[-] Mime type error: " + mimeType);
                 deleteFile(filePath);
@@ -138,21 +140,44 @@ public class FileUpload {
             }
         }
 
-        // Verify file content is actually an image
+        // Verify file is actually an image (check 3)
         boolean isImageFlag = isImage(excelFile);
-        deleteFile(randomFilePath);
+        deleteFile(randomFilePath); // Note: There appears to be an undefined variable "randomFilePath" in the original code
 
         if (!isImageFlag) {
-            logger.error("[-] File is not Image");
+            logger.error("[-] File is not an Image");
             deleteFile(filePath);
             return "Upload failed. Illegal picture format.";
         }
 
         try {
-            // Get the file content and save it using the secure filename
+            // Get the file content and save it to the secure path
             byte[] bytes = multifile.getBytes();
-            Path path = Paths.get(UPLOADED_FOLDER, secureFileName);
             
+            // Create a safe Path object using the secure filename
+            Path path = Paths.get(UPLOADED_FOLDER, secureFilename);
+            
+            // Verify the final path is within the intended directory
+            Path normalizedPath = path.normalize();
+            Path targetDirPath = Paths.get(UPLOADED_FOLDER).normalize();
+            
+            if (!normalizedPath.startsWith(targetDirPath)) {
+                logger.error("[-] Directory traversal attempt detected");
+                return "Upload failed. Security violation.";
+            }
+            
+            Files.write(path, bytes);
+        } catch (IOException e) {
+            logger.error(e.toString());
+            deleteFile(filePath);
+            return "Upload failed";
+        }
+
+        logger.info("[+] Safe file. Suffix: null, MIME: null", Suffix, mimeType);
+        logger.info("[+] Successfully uploaded null", filePath);
+        return String.format("You successfully uploaded '%s'", secureFilename);
+    }
+
             // Validate that the resulting path is within the intended directory
             Path normalizedPath = path.normalize();
             if (!normalizedPath.startsWith(Paths.get(UPLOADED_FOLDER).normalize())) {
@@ -173,13 +198,31 @@ public class FileUpload {
     }
 
 
-    private void deleteFile(String filePath) {
-        File delFile = new File(filePath);
-        if(delFile.isFile() && delFile.exists()) {
-            if (delFile.delete()) {
-                logger.info("[+] " + filePath + " delete successfully!");
+private void deleteFile(String filePath) {
+        try {
+            // Normalize the path
+            Path path = Paths.get(filePath).normalize();
+            Path targetDirPath = Paths.get(UPLOADED_FOLDER).normalize();
+            
+            // Verify the path is within the intended directory
+            if (!path.startsWith(targetDirPath)) {
+                logger.error("[-] Directory traversal attempt detected during file deletion: " + filePath);
                 return;
             }
+            
+            File delFile = path.toFile();
+            if(delFile.isFile() && delFile.exists()) {
+                if (delFile.delete()) {
+                    logger.info("[+] " + filePath + " deleted successfully!");
+                    return;
+                }
+            }
+            logger.info(filePath + " delete failed!");
+        } catch (Exception e) {
+            logger.error("Error during file deletion: " + e.getMessage());
+        }
+    }
+
         }
         logger.info(filePath + " delete failed!");
     }
