@@ -200,9 +200,29 @@ public String xmlReaderVuln(HttpServletRequest request) {
     }
 
 
-    @RequestMapping(value = "/Digester/vuln", method = RequestMethod.POST)
-    public String DigesterVuln(HttpServletRequest request) {
-        try {
+@RequestMapping(value = "/Digester/vuln", method = RequestMethod.POST)
+public String DigesterVuln(HttpServletRequest request) {
+    try {
+        String body = WebUtils.getRequestBody(request);
+        logger.info(body);
+
+        Digester digester = new Digester();
+        // Disable DTD processing to prevent XXE attacks
+        digester.setValidating(false);
+        digester.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        digester.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        digester.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        digester.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        
+        // Parse the XML safely now
+        digester.parse(new StringReader(body));
+    } catch (Exception e) {
+        logger.error(e.toString());
+        return EXCEPT;
+    }
+    return "Digester xxe vuln code";
+}
+
             String body = WebUtils.getRequestBody(request);
             logger.info(body);
 
