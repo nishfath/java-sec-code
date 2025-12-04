@@ -13,17 +13,33 @@ public class WebUtils {
 
     // Get request body.
 public static String getRequestBody(HttpServletRequest request) throws IOException {
+    // Set a reasonable size limit to prevent DoS attacks
+    int maxSize = 1024 * 1024; // 1MB limit
     InputStream in = request.getInputStream();
-    return convertStreamToString(in);
+    return convertStreamToString(in, maxSize);
 }
+
 
 
 
     // https://stackoverflow.com/questions/309424/how-do-i-read-convert-an-inputstream-into-a-string-in-java
 public static String convertStreamToString(java.io.InputStream is) {
-    java.util.Scanner s = new java.util.Scanner(is).useDelimiter("\\A");
-    return s.hasNext() ? s.next() : "";
+    return convertStreamToString(is, Integer.MAX_VALUE);
 }
+
+public static String convertStreamToString(java.io.InputStream is, int maxSize) {
+    try (java.util.Scanner s = new java.util.Scanner(is).useDelimiter("\\A")) {
+        if (s.hasNext()) {
+            String content = s.next();
+            if (content.length() > maxSize) {
+                return content.substring(0, maxSize);
+            }
+            return content;
+        }
+        return "";
+    }
+}
+
 
 
     public static String getCookieValueByName(HttpServletRequest request, String cookieName) {
