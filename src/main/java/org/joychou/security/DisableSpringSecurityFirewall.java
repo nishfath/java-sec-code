@@ -20,8 +20,12 @@ public class DisableSpringSecurityFirewall implements HttpFirewall {
         };
     }
 
-    @Override
-    public HttpServletResponse getFirewalledResponse(HttpServletResponse response) {
-        return response;
-    }
+@Override
+public HttpServletResponse getFirewalledResponse(HttpServletResponse response) {
+    // Use the wrapped response from StrictHttpFirewall
+    // This provides proper security filtering for HTTP responses
+    StrictHttpFirewall strictFirewall = new StrictHttpFirewall();
+    return strictFirewall.getFirewalledResponse(response);
+}
+
 }
