@@ -44,12 +44,31 @@ public static String getFileExtension(String fullName) {
 
 
 
-    public static String getNameWithoutExtension(String file) {
-        Preconditions.checkNotNull(file);
-        String fileName = (new File(file)).getName();
-        int dotIndex = fileName.lastIndexOf('.');
-        return dotIndex == -1 ? fileName : fileName.substring(0, dotIndex);
+public static String getNameWithoutExtension(String file) {
+    Preconditions.checkNotNull(file);
+    
+    // Extract only the filename from the URL, not creating a File object from URL
+    String fileName = "";
+    try {
+        URL url = new URL(file);
+        String path = url.getPath();
+        // Get only the last part of the path
+        fileName = path.substring(path.lastIndexOf('/') + 1);
+        // Additional security: remove any potential path traversal sequences
+        fileName = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
+    } catch (MalformedURLException e) {
+        // If not a valid URL, get only the last part of the path
+        file = file.replaceAll("\\\\", "/");
+        fileName = file.substring(file.lastIndexOf('/') + 1);
+        // Additional security: remove any potential path traversal sequences
+        fileName = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
     }
+    
+    // Safe way to get filename without extension
+    int dotIndex = fileName.lastIndexOf('.');
+    return dotIndex == -1 ? fileName : fileName.substring(0, dotIndex);
+}
+
 
 
 }
