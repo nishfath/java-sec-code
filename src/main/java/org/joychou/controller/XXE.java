@@ -382,21 +382,45 @@ public String xmlReaderVuln(HttpServletRequest request) {
     }
 
 
-    @PostMapping("/XMLReader/vuln")
-    public String XMLReaderVuln(HttpServletRequest request) {
-        try {
-            String body = WebUtils.getRequestBody(request);
-            logger.info(body);
+@PostMapping("/XMLReader/vuln")
+public String XMLReaderVuln(HttpServletRequest request) {
+    try {
+        String body = WebUtils.getRequestBody(request);
+        logger.info(body);
 
-            SAXParserFactory spf = SAXParserFactory.newInstance();
-            SAXParser saxParser = spf.newSAXParser();
-            XMLReader xmlReader = saxParser.getXMLReader();
-            xmlReader.parse(new InputSource(new StringReader(body)));
+        // Create a secure SAXParserFactory
+        SAXParserFactory spf = SAXParserFactory.newInstance();
+        
+        // Disable external general entities
+        spf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        
+        // Disable external parameter entities
+        spf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        
+        // Disable DTD processing
+        spf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        
+        // Prevent XXE attacks
+        spf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        
+        // Enable secure processing
+        spf.setXIncludeAware(false);
+        spf.setNamespaceAware(true);
+        
+        SAXParser saxParser = spf.newSAXParser();
+        XMLReader xmlReader = saxParser.getXMLReader();
+        
+        // Parse the XML input
+        xmlReader.parse(new InputSource(new StringReader(body)));
 
-        } catch (Exception e) {
-            logger.error(e.toString());
-            return EXCEPT;
-        }
+    } catch (Exception e) {
+        logger.error(e.toString());
+        return EXCEPT;
+    }
+
+    return "XMLReader xxe protected code";
+}
+
 
         return "XMLReader xxe vuln code";
     }
