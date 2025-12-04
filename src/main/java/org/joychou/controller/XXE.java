@@ -41,18 +41,27 @@ public class XXE {
     private static Logger logger = LoggerFactory.getLogger(XXE.class);
     private static String EXCEPT = "xxe except";
 
-    @PostMapping("/xmlReader/vuln")
-    public String xmlReaderVuln(HttpServletRequest request) {
-        try {
-            String body = WebUtils.getRequestBody(request);
-            logger.info(body);
-            XMLReader xmlReader = XMLReaderFactory.createXMLReader();
-            xmlReader.parse(new InputSource(new StringReader(body)));  // parse xml
-            return "xmlReader xxe vuln code";
-        } catch (Exception e) {
-            logger.error(e.toString());
-            return EXCEPT;
-        }
+@PostMapping("/xmlReader/vuln")
+public String xmlReaderVuln(HttpServletRequest request) {
+    try {
+        String body = WebUtils.getRequestBody(request);
+        logger.info(body);
+        XMLReader xmlReader = XMLReaderFactory.createXMLReader();
+        
+        // Disable XXE by setting security features
+        xmlReader.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        xmlReader.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        xmlReader.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        xmlReader.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        
+        xmlReader.parse(new InputSource(new StringReader(body)));  // parse xml
+        return "xmlReader xxe protection enabled";
+    } catch (Exception e) {
+        logger.error(e.toString());
+        return EXCEPT;
+    }
+}
+
     }
 
 
