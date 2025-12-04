@@ -79,37 +79,48 @@ public class FileUpload {
     }
 
     // only upload picture
-    @PostMapping("/upload/picture")
+@PostMapping("/upload/picture")
     @ResponseBody
     public String uploadPicture(@RequestParam("file") MultipartFile multifile) throws Exception {
         if (multifile.isEmpty()) {
             return "Please select a file to upload";
         }
 
-        String fileName = multifile.getOriginalFilename();
-        String Suffix = fileName.substring(fileName.lastIndexOf(".")); // 获取文件后缀名
-        String mimeType = multifile.getContentType(); // 获取MIME类型
-        String filePath = UPLOADED_FOLDER + fileName;
+        String originalFileName = multifile.getOriginalFilename();
+        if (originalFileName == null) {
+            return "Invalid filename";
+        }
+        
+        // Extract file extension safely
+        String suffix = "";
+        int lastDotIndex = originalFileName.lastIndexOf(".");
+        if (lastDotIndex > 0) {
+            suffix = originalFileName.substring(lastDotIndex).toLowerCase();
+        }
+        
+        String mimeType = multifile.getContentType(); // Get MIME type
+        
+        // Generate a secure random filename to prevent directory traversal
+        String secureFileName = UUID.randomUUID().toString() + suffix;
+        String filePath = UPLOADED_FOLDER + secureFileName;
         File excelFile = convert(multifile);
 
-
-        // 判断文件后缀名是否在白名单内  校验1
+        // Check if file extension is in whitelist
         String[] picSuffixList = {".jpg", ".png", ".jpeg", ".gif", ".bmp", ".ico"};
         boolean suffixFlag = false;
         for (String white_suffix : picSuffixList) {
-            if (Suffix.toLowerCase().equals(white_suffix)) {
+            if (suffix.toLowerCase().equals(white_suffix)) {
                 suffixFlag = true;
                 break;
             }
         }
         if (!suffixFlag) {
-            logger.error("[-] Suffix error: " + Suffix);
+            logger.error("[-] Suffix error: " + suffix);
             deleteFile(filePath);
-            return "Upload failed. Illeagl picture.";
+            return "Upload failed. Illegal picture format.";
         }
 
-
-        // 判断MIME类型是否在黑名单内 校验2
+        // Check if MIME type is in blacklist
         String[] mimeTypeBlackList = {
                 "text/html",
                 "text/javascript",
@@ -119,29 +130,36 @@ public class FileUpload {
                 "application/xml"
         };
         for (String blackMimeType : mimeTypeBlackList) {
-            // 用contains是为了防止text/html;charset=UTF-8绕过
+            // Using contains to prevent bypass with text/html;charset=UTF-8
             if (SecurityUtil.replaceSpecialStr(mimeType).toLowerCase().contains(blackMimeType)) {
                 logger.error("[-] Mime type error: " + mimeType);
                 deleteFile(filePath);
-                return "Upload failed. Illeagl picture.";
+                return "Upload failed. Illegal picture format.";
             }
         }
 
-        // 判断文件内容是否是图片 校验3
+        // Verify file content is actually an image
         boolean isImageFlag = isImage(excelFile);
         deleteFile(randomFilePath);
 
         if (!isImageFlag) {
             logger.error("[-] File is not Image");
             deleteFile(filePath);
-            return "Upload failed. Illeagl picture.";
+            return "Upload failed. Illegal picture format.";
         }
 
-
         try {
-            // Get the file and save it somewhere
+            // Get the file content and save it using the secure filename
             byte[] bytes = multifile.getBytes();
-            Path path = Paths.get(UPLOADED_FOLDER + multifile.getOriginalFilename());
+            Path path = Paths.get(UPLOADED_FOLDER, secureFileName);
+            
+            // Validate that the resulting path is within the intended directory
+            Path normalizedPath = path.normalize();
+            if (!normalizedPath.startsWith(Paths.get(UPLOADED_FOLDER).normalize())) {
+                logger.error("[-] Directory traversal attempt detected");
+                return "Upload failed. Security violation.";
+            }
+            
             Files.write(path, bytes);
         } catch (IOException e) {
             logger.error(e.toString());
@@ -149,10 +167,11 @@ public class FileUpload {
             return "Upload failed";
         }
 
-        logger.info("[+] Safe file. Suffix: {}, MIME: {}", Suffix, mimeType);
-        logger.info("[+] Successfully uploaded {}", filePath);
-        return String.format("You successfully uploaded '%s'", filePath);
+        logger.info("[+] Safe file. Suffix: null, MIME: null", suffix, mimeType);
+        logger.info("[+] Successfully uploaded null", filePath);
+        return String.format("You successfully uploaded '%s' as '%s'", originalFileName, secureFileName);
     }
+
 
     private void deleteFile(String filePath) {
         File delFile = new File(filePath);
