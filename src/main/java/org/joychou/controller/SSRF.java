@@ -105,19 +105,20 @@ public class SSRF {
      * The default setting of followRedirects is true.
      * UserAgent is Java/1.8.0_102.
      */
-    @GetMapping("/ImageIO/sec")
-    public String ImageIO(@RequestParam String url) {
-        try {
-            SecurityUtil.startSSRFHook();
-            HttpUtils.imageIO(url);
-        } catch (SSRFException | IOException e) {
-            return e.getMessage();
-        } finally {
-            SecurityUtil.stopSSRFHook();
-        }
-
-        return "ImageIO ssrf test";
+@GetMapping("/ImageIO/sec")
+public String ImageIO(@RequestParam String url) {
+    try {
+        SecurityUtil.startSSRFHook();
+        HttpUtils.imageIO(url);
+    } catch (SSRFException | IOException e) {
+        return "Error: " + e.getMessage();
+    } finally {
+        SecurityUtil.stopSSRFHook();
     }
+
+    return "ImageIO ssrf test completed successfully";
+}
+
 
 
     @GetMapping("/okhttp/sec")
