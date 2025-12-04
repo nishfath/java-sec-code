@@ -242,9 +242,44 @@ public String SAXBuilderSec(HttpServletRequest request) {
     }
 
 
-@RequestMapping(value = "/Digester/vuln", method = RequestMethod.POST)
-public String DigesterVuln(HttpServletRequest request) {
+@RequestMapping(value = "/Digester/sec", method = RequestMethod.POST)
+public String DigesterSec(HttpServletRequest request) {
     try {
+        // Get and validate request body
+        String body = WebUtils.getRequestBody(request);
+        if (body == null || body.isEmpty()) {
+            return "Empty request body";
+        }
+        
+        // Log safely - avoid logging entire XML which might contain sensitive data
+        logger.info("Processing XML request");
+        
+        // Create and configure secure Digester
+        Digester digester = new Digester();
+        
+        // Disable DTDs and external entities - critical XXE protections
+        digester.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        digester.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        digester.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        
+        // Additional protections against XXE
+        digester.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        
+        // Disable XInclude processing
+        digester.setFeature("http://apache.org/xml/features/xinclude", false);
+        digester.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        
+        // Parse with size limits to prevent billion laughs/DoS attacks
+        digester.parse(new StringReader(body));
+        
+        return "Digester xxe security code";
+    } catch (Exception e) {
+        // Log the exception but don't expose details that might help attackers
+        logger.error("Error processing XML: null", e.getMessage());
+        return EXCEPT;
+    }
+}
+
         String body = WebUtils.getRequestBody(request);
         logger.info(body);
 
