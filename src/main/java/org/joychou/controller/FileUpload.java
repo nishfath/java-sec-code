@@ -47,31 +47,57 @@ public class FileUpload {
         return "uploadPic"; // return uploadPic.html page
     }
 
-    @PostMapping("/upload")
-    public String singleFileUpload(@RequestParam("file") MultipartFile file,
-                                   RedirectAttributes redirectAttributes) {
-        if (file.isEmpty()) {
-            // 赋值给uploadStatus.html里的动态参数message
-            redirectAttributes.addFlashAttribute("message", "Please select a file to upload");
-            return "redirect:/file/status";
-        }
-
-        try {
-            // Get the file and save it somewhere
-            byte[] bytes = file.getBytes();
-            Path path = Paths.get(UPLOADED_FOLDER + file.getOriginalFilename());
-            Files.write(path, bytes);
-
-            redirectAttributes.addFlashAttribute("message",
-                    "You successfully uploaded '" + UPLOADED_FOLDER + file.getOriginalFilename() + "'");
-
-        } catch (IOException e) {
-            redirectAttributes.addFlashAttribute("message", "upload failed");
-            logger.error(e.toString());
-        }
-
+@PostMapping("/upload")
+public String singleFileUpload(@RequestParam("file") MultipartFile file,
+                               RedirectAttributes redirectAttributes) {
+    if (file.isEmpty()) {
+        // 赋值给uploadStatus.html里的动态参数message
+        redirectAttributes.addFlashAttribute("message", "Please select a file to upload");
         return "redirect:/file/status";
     }
+
+    try {
+        // Get the file extension
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension = FilenameUtils.getExtension(originalFilename);
+        
+        // Generate a secure random filename with original extension
+        String secureFilename = UUID.randomUUID().toString() + "." + fileExtension;
+        
+        // Create a safe path using the secure filename
+        Path uploadDir = Paths.get(UPLOADED_FOLDER);
+        
+        // Ensure the upload directory exists
+        if (!Files.exists(uploadDir)) {
+            Files.createDirectories(uploadDir);
+        }
+        
+        // Construct the full path safely
+        Path path = uploadDir.resolve(secureFilename);
+        
+        // Verify the final path is still within the intended directory
+        if (!path.normalize().startsWith(uploadDir.normalize())) {
+            throw new SecurityException("Path traversal attempt detected");
+        }
+        
+        // Save the file
+        byte[] bytes = file.getBytes();
+        Files.write(path, bytes);
+
+        redirectAttributes.addFlashAttribute("message",
+                "You successfully uploaded file as '" + secureFilename + "'");
+
+    } catch (IOException e) {
+        redirectAttributes.addFlashAttribute("message", "Upload failed");
+        logger.error("File upload error: null", e.toString());
+    } catch (SecurityException e) {
+        redirectAttributes.addFlashAttribute("message", "Upload failed: Security violation");
+        logger.error("Security violation in file upload: null", e.toString());
+    }
+
+    return "redirect:/file/status";
+}
+
 
     @GetMapping("/status")
     public String uploadStatus() {
