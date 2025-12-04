@@ -88,20 +88,34 @@ public String xmlReaderVuln(HttpServletRequest request) {
     }
 
 
-    @RequestMapping(value = "/SAXBuilder/vuln", method = RequestMethod.POST)
-    public String SAXBuilderVuln(HttpServletRequest request) {
-        try {
-            String body = WebUtils.getRequestBody(request);
-            logger.info(body);
+@RequestMapping(value = "/SAXBuilder/vuln", method = RequestMethod.POST)
+public String SAXBuilderVuln(HttpServletRequest request) {
+    try {
+        String body = WebUtils.getRequestBody(request);
+        logger.info(body);
 
-            SAXBuilder builder = new SAXBuilder();
-            // org.jdom2.Document document
-            builder.build(new InputSource(new StringReader(body)));  // cause xxe
-            return "SAXBuilder xxe vuln code";
-        } catch (Exception e) {
-            logger.error(e.toString());
-            return EXCEPT;
-        }
+        // Create a secure SAXBuilder with external entity processing disabled
+        SAXBuilder builder = new SAXBuilder();
+        
+        // Disable DTD processing to prevent XXE attacks
+        builder.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        
+        // Disable external entity resolution
+        builder.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        builder.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        
+        // Disable entity expansion
+        builder.setExpandEntities(false);
+        
+        // Parse the XML safely now
+        builder.build(new InputSource(new StringReader(body)));
+        return "SAXBuilder xxe protected code";
+    } catch (Exception e) {
+        logger.error(e.toString());
+        return EXCEPT;
+    }
+}
+
     }
 
     @RequestMapping(value = "/SAXBuilder/sec", method = RequestMethod.POST)
