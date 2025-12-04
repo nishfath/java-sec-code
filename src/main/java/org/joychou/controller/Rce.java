@@ -25,31 +25,51 @@ import java.io.InputStreamReader;
 @RequestMapping("/rce")
 public class Rce {
 
-    @GetMapping("/runtime/exec")
-    public String CommandExec(String cmd) {
-        Runtime run = Runtime.getRuntime();
-        StringBuilder sb = new StringBuilder();
-
-        try {
-            Process p = run.exec(cmd);
-            BufferedInputStream in = new BufferedInputStream(p.getInputStream());
-            BufferedReader inBr = new BufferedReader(new InputStreamReader(in));
-            String tmpStr;
-
-            while ((tmpStr = inBr.readLine()) != null) {
-                sb.append(tmpStr);
-            }
-
-            if (p.waitFor() != 0) {
-                if (p.exitValue() == 1)
-                    return "Command exec failed!!";
-            }
-
-            inBr.close();
-            in.close();
-        } catch (Exception e) {
-            return e.toString();
+@GetMapping("/runtime/exec")
+public String CommandExec(String cmd) {
+    // Define a whitelist of allowed commands
+    Set<String> allowedCommands = new HashSet<>(Arrays.asList(
+        "ls", "dir", "echo", "whoami", "pwd"
+    ));
+    
+    // Parse the command to extract the base command (first word before any space)
+    String baseCommand = cmd.trim().split("\\s+")[0];
+    
+    // Check if the base command is in the whitelist
+    if (!allowedCommands.contains(baseCommand)) {
+        return "Command not allowed for security reasons";
+    }
+    
+    // Use ProcessBuilder instead of Runtime.exec for better security
+    ProcessBuilder processBuilder = new ProcessBuilder();
+    StringBuilder sb = new StringBuilder();
+    
+    try {
+        // Set the command as a list of arguments to prevent command injection
+        processBuilder.command(cmd.trim().split("\\s+"));
+        Process p = processBuilder.start();
+        
+        BufferedInputStream in = new BufferedInputStream(p.getInputStream());
+        BufferedReader inBr = new BufferedReader(new InputStreamReader(in));
+        String tmpStr;
+        
+        while ((tmpStr = inBr.readLine()) != null) {
+            sb.append(tmpStr).append("\n");
         }
+        
+        if (p.waitFor() != 0) {
+            if (p.exitValue() == 1)
+                return "Command exec failed!!";
+        }
+        
+        inBr.close();
+        in.close();
+    } catch (Exception e) {
+        return "Error: " + e.getMessage();
+    }
+    return sb.toString();
+}
+
         return sb.toString();
     }
 
