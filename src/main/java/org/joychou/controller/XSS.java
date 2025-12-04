@@ -37,13 +37,16 @@ public class XSS {
      *
      * @param xss unescape string
      */
-    @RequestMapping("/stored/store")
-    @ResponseBody
-    public String store(String xss, HttpServletResponse response) {
-        Cookie cookie = new Cookie("xss", xss);
-        response.addCookie(cookie);
-        return "Set param into cookie";
-    }
+@RequestMapping("/stored/store")
+@ResponseBody
+public String store(String xss, HttpServletResponse response) {
+    Cookie cookie = new Cookie("xss", xss);
+    cookie.setSecure(true);    // Set secure flag to ensure cookie is only sent over HTTPS
+    cookie.setHttpOnly(true);  // Set HttpOnly flag to prevent JavaScript access to the cookie
+    response.addCookie(cookie);
+    return "Set param into cookie";
+}
+
 
     /**
      * Vul Code.
