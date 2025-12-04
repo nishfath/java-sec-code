@@ -70,33 +70,62 @@ public class SSRF {
      * new URL(String url).openStream()
      * new URL(String url).getContent()
      */
-    @GetMapping("/openStream")
-    public void openStream(@RequestParam String url, HttpServletResponse response) throws IOException {
-        InputStream inputStream = null;
-        OutputStream outputStream = null;
-        try {
-            String downLoadImgFileName = WebUtils.getNameWithoutExtension(url) + "." + WebUtils.getFileExtension(url);
-            // download
-            response.setHeader("content-disposition", "attachment;fileName=" + downLoadImgFileName);
+@GetMapping("/openStream")
+public void openStream(@RequestParam String url, HttpServletResponse response) throws IOException {
+    InputStream inputStream = null;
+    OutputStream outputStream = null;
+    try {
+        // Validate URL format and protocol (additional check)
+        if (!isValidUrl(url)) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid URL format or protocol");
+            return;
+        }
+        
+        // Extract safe filename without path traversal characters
+        URL u = new URL(url);
+        String urlPath = u.getPath();
+        String safeName = FilenameUtils.getName(urlPath); // Safe extraction without path traversal
+        
+        // Get safe extension and base name
+        String fileExtension = WebUtils.getFileExtension(safeName);
+        String baseName = WebUtils.getNameWithoutExtension(safeName);
+        String downLoadImgFileName = baseName + "." + fileExtension;
+        
+        // Set download header with sanitized filename
+        response.setHeader("content-disposition", "attachment;fileName=" + downLoadImgFileName);
 
-            URL u = new URL(url);
-            int length;
-            byte[] bytes = new byte[1024];
-            inputStream = u.openStream(); // send request
-            outputStream = response.getOutputStream();
-            while ((length = inputStream.read(bytes)) > 0) {
-                outputStream.write(bytes, 0, length);
-            }
+        int length;
+        byte[] bytes = new byte[1024];
+        inputStream = u.openStream(); // send request
+        outputStream = response.getOutputStream();
+        while ((length = inputStream.read(bytes)) > 0) {
+            outputStream.write(bytes, 0, length);
+        }
 
-        } catch (Exception e) {
-            logger.error(e.toString());
-        } finally {
-            if (inputStream != null) {
-                inputStream.close();
-            }
-            if (outputStream != null) {
-                outputStream.close();
-            }
+    } catch (Exception e) {
+        logger.error(e.toString());
+    } finally {
+        if (inputStream != null) {
+            inputStream.close();
+        }
+        if (outputStream != null) {
+            outputStream.close();
+        }
+    }
+}
+
+// Helper method to validate URL
+private boolean isValidUrl(String url) {
+    try {
+        URL u = new URL(url);
+        String protocol = u.getProtocol().toLowerCase();
+        // Only allow HTTP or HTTPS protocols
+        return "http".equals(protocol) || "https".equals(protocol);
+    } catch (Exception e) {
+        return false;
+    }
+}
+
         }
     }
 
