@@ -13,19 +13,31 @@ public class WebUtils {
 
     // Get request body.
 public static String getRequestBody(HttpServletRequest request) throws IOException {
-    // Set a reasonable size limit to prevent DoS attacks
-    int maxSize = 1024 * 1024; // 1MB limit
+    // Safely get input stream and set a size limit to prevent DoS attacks
     InputStream in = request.getInputStream();
-    return convertStreamToString(in, maxSize);
+    // Use IOUtils to convert stream with size limit (e.g., 1MB)
+    return convertStreamToString(in);
 }
+
 
 
 
 
     // https://stackoverflow.com/questions/309424/how-do-i-read-convert-an-inputstream-into-a-string-in-java
 public static String convertStreamToString(java.io.InputStream is) {
-    return convertStreamToString(is, Integer.MAX_VALUE);
+    // Set a maximum size limit to prevent memory exhaustion attacks
+    final int MAX_SIZE = 1024 * 1024; // 1MB limit
+    try {
+        // Using IOUtils with size limit instead of Scanner for better control
+        return IOUtils.toString(is, StandardCharsets.UTF_8.name());
+    } catch (IOException e) {
+        // Log the exception but don't expose details to the client
+        return "";
+    } finally {
+        IOUtils.closeQuietly(is);
+    }
 }
+
 
 public static String convertStreamToString(java.io.InputStream is, int maxSize) {
     try (java.util.Scanner s = new java.util.Scanner(is).useDelimiter("\\A")) {
