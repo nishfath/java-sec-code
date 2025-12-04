@@ -118,9 +118,37 @@ public String SAXBuilderVuln(HttpServletRequest request) {
 
     }
 
-    @RequestMapping(value = "/SAXBuilder/sec", method = RequestMethod.POST)
-    public String SAXBuilderSec(HttpServletRequest request) {
-        try {
+@RequestMapping(value = "/SAXBuilder/sec", method = RequestMethod.POST)
+public String SAXBuilderSec(HttpServletRequest request) {
+    try {
+        String body = WebUtils.getRequestBody(request);
+        logger.info("Processing XML input");
+        
+        // Don't log raw XML input which might contain sensitive data
+        
+        // Create secure SAXBuilder with XXE protections
+        SAXBuilder builder = new SAXBuilder();
+        
+        // Disable DOCTYPE declarations to prevent XXE
+        builder.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        
+        // Disable external entities
+        builder.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        builder.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        
+        // Additional protection against XXE
+        builder.setExpandEntities(false);
+        
+        // Parse the XML with secure settings
+        builder.build(new InputSource(new StringReader(body)));
+    } catch (Exception e) {
+        logger.error("XML parsing error: " + e.getMessage());
+        return EXCEPT;
+    }
+
+    return "SAXBuilder xxe security code";
+}
+
             String body = WebUtils.getRequestBody(request);
             logger.info(body);
 
