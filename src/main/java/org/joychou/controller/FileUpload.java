@@ -80,77 +80,103 @@ public class FileUpload {
 
     // only upload picture
 @PostMapping("/upload/picture")
-    @ResponseBody
-    public String uploadPicture(@RequestParam("file") MultipartFile multifile) throws Exception {
-        if (multifile.isEmpty()) {
-            return "Please select a file to upload";
-        }
+@ResponseBody
+public String uploadPicture(@RequestParam("file") MultipartFile multifile) throws Exception {
+    if (multifile.isEmpty()) {
+        return "Please select a file to upload";
+    }
 
-        // Extract filename safely
-        String originalFilename = multifile.getOriginalFilename();
-        if (originalFilename == null) {
-            return "Invalid filename";
-        }
-        
-        // Extract file extension using a safe method
-        String extension = FilenameUtils.getExtension(originalFilename);
-        if (extension == null || extension.isEmpty()) {
-            return "File must have an extension";
-        }
-        
-        // Generate a secure random filename with the original extension
-        String secureFilename = UUID.randomUUID().toString() + "." + extension;
-        String Suffix = "." + extension.toLowerCase();
-        String mimeType = multifile.getContentType(); // Get MIME type
-        
-        // Create safe file path with the secure filename
-        String filePath = UPLOADED_FOLDER + secureFilename;
-        File excelFile = convert(multifile);
+    String originalFileName = multifile.getOriginalFilename();
+    if (originalFileName == null) {
+        return "Invalid filename";
+    }
+    
+    // Extract file extension safely
+    String suffix = "";
+    int lastDotIndex = originalFileName.lastIndexOf(".");
+    if (lastDotIndex > 0) {
+        suffix = originalFileName.substring(lastDotIndex);
+    }
+    
+    String mimeType = multifile.getContentType(); // Get MIME type
+    
+    // Generate a secure random filename to prevent directory traversal
+    UUID uuid = Generators.timeBasedGenerator().generate();
+    String secureFileName = uuid + suffix;
+    String filePath = UPLOADED_FOLDER + secureFileName;
+    
+    // Convert multifile to a temporary file for inspection
+    File excelFile = convert(multifile);
+    if (excelFile == null) {
+        return "File creation failed";
+    }
 
-        // Validate file extension against whitelist (check 1)
-        String[] picSuffixList = {".jpg", ".png", ".jpeg", ".gif", ".bmp", ".ico"};
-        boolean suffixFlag = false;
-        for (String white_suffix : picSuffixList) {
-            if (Suffix.toLowerCase().equals(white_suffix)) {
-                suffixFlag = true;
-                break;
-            }
+    // Check if file suffix is in whitelist - validation 1
+    String[] picSuffixList = {".jpg", ".png", ".jpeg", ".gif", ".bmp", ".ico"};
+    boolean suffixFlag = false;
+    for (String white_suffix : picSuffixList) {
+        if (suffix.toLowerCase().equals(white_suffix)) {
+            suffixFlag = true;
+            break;
         }
-        if (!suffixFlag) {
-            logger.error("[-] Suffix error: " + Suffix);
+    }
+    if (!suffixFlag) {
+        logger.error("[-] Suffix error: " + suffix);
+        deleteFile(filePath);
+        return "Upload failed. Illegal picture format.";
+    }
+
+    // Check if MIME type is in blacklist - validation 2
+    String[] mimeTypeBlackList = {
+            "text/html",
+            "text/javascript",
+            "application/javascript",
+            "application/ecmascript",
+            "text/xml",
+            "application/xml"
+    };
+    for (String blackMimeType : mimeTypeBlackList) {
+        // Contains check to prevent bypass like text/html;charset=UTF-8
+        if (SecurityUtil.replaceSpecialStr(mimeType).toLowerCase().contains(blackMimeType)) {
+            logger.error("[-] Mime type error: " + mimeType);
             deleteFile(filePath);
             return "Upload failed. Illegal picture format.";
         }
+    }
 
-        // Check MIME type against blacklist (check 2)
-        String[] mimeTypeBlackList = {
-                "text/html",
-                "text/javascript",
-                "application/javascript",
-                "application/ecmascript",
-                "text/xml",
-                "application/xml"
-        };
-        for (String blackMimeType : mimeTypeBlackList) {
-            // Use contains to prevent bypasses like text/html;charset=UTF-8
-            if (SecurityUtil.replaceSpecialStr(mimeType).toLowerCase().contains(blackMimeType)) {
-                logger.error("[-] Mime type error: " + mimeType);
-                deleteFile(filePath);
-                return "Upload failed. Illegal picture format.";
-            }
+    // Check if file content is actually an image - validation 3
+    boolean isImageFlag = isImage(excelFile);
+    deleteFile(randomFilePath);
+
+    if (!isImageFlag) {
+        logger.error("[-] File is not Image");
+        deleteFile(filePath);
+        return "Upload failed. Illegal picture format.";
+    }
+
+    try {
+        // Save file using the secure filename
+        byte[] bytes = multifile.getBytes();
+        Path path = Paths.get(UPLOADED_FOLDER + secureFileName);
+        
+        // Validate the path is within the intended directory
+        if (!path.normalize().startsWith(Paths.get(UPLOADED_FOLDER).normalize())) {
+            logger.error("[-] Path traversal attempt detected");
+            return "Upload failed. Invalid path.";
         }
+        
+        Files.write(path, bytes);
+    } catch (IOException | InvalidPathException e) {
+        logger.error(e.toString());
+        deleteFile(filePath);
+        return "Upload failed";
+    }
 
-        // Verify file is actually an image (check 3)
-        boolean isImageFlag = isImage(excelFile);
-        deleteFile(randomFilePath); // Note: There appears to be an undefined variable "randomFilePath" in the original code
+    logger.info("[+] Safe file. Suffix: null, MIME: null", suffix, mimeType);
+    logger.info("[+] Successfully uploaded null (original: null)", filePath, originalFileName);
+    return String.format("You successfully uploaded '%s'", secureFileName);
+}
 
-        if (!isImageFlag) {
-            logger.error("[-] File is not an Image");
-            deleteFile(filePath);
-            return "Upload failed. Illegal picture format.";
-        }
-
-        try {
             // Get the file content and save it to the secure path
             byte[] bytes = multifile.getBytes();
             
@@ -233,17 +259,45 @@ private void deleteFile(String filePath) {
      * 不建议使用transferTo，因为原始的MultipartFile会被覆盖
      * https://stackoverflow.com/questions/24339990/how-to-convert-a-multipart-file-to-file
      */
-    private File convert(MultipartFile multiFile) throws Exception {
-        String fileName = multiFile.getOriginalFilename();
-        String suffix = fileName.substring(fileName.lastIndexOf("."));
-        UUID uuid = Generators.timeBasedGenerator().generate();
-        randomFilePath = UPLOADED_FOLDER + uuid + suffix;
-        // 随机生成一个同后缀名的文件
-        File convFile = new File(randomFilePath);
-        boolean ret = convFile.createNewFile();
-        if (!ret) {
-            return null;
-        }
+private File convert(MultipartFile multiFile) throws Exception {
+    if (multiFile == null || multiFile.getOriginalFilename() == null) {
+        return null;
+    }
+    
+    // Extract file extension safely
+    String originalFileName = multiFile.getOriginalFilename();
+    String suffix = "";
+    int lastDotIndex = originalFileName.lastIndexOf(".");
+    if (lastDotIndex > 0) {
+        suffix = originalFileName.substring(lastDotIndex);
+    }
+    
+    // Generate a secure random filename with UUID
+    UUID uuid = Generators.timeBasedGenerator().generate();
+    randomFilePath = UPLOADED_FOLDER + uuid + suffix;
+    
+    // Create a temporary file for inspection
+    File convFile = new File(randomFilePath);
+    
+    // Validate the path is within the intended directory
+    Path path = convFile.toPath().normalize();
+    if (!path.startsWith(Paths.get(UPLOADED_FOLDER).normalize())) {
+        logger.error("[-] Path traversal attempt detected");
+        return null;
+    }
+    
+    boolean ret = convFile.createNewFile();
+    if (!ret) {
+        return null;
+    }
+    
+    try (FileOutputStream fos = new FileOutputStream(convFile)) {
+        fos.write(multiFile.getBytes());
+    }
+    
+    return convFile;
+}
+
         FileOutputStream fos = new FileOutputStream(convFile);
         fos.write(multiFile.getBytes());
         fos.close();
