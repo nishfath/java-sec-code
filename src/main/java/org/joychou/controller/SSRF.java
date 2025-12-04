@@ -70,35 +70,75 @@ public class SSRF {
      * new URL(String url).openStream()
      * new URL(String url).getContent()
      */
+private static final Logger logger = LoggerFactory.getLogger(SSRF.class);
+private static final List<String> ALLOWED_SCHEMES = Arrays.asList("http", "https");
+private static final Pattern IP_PATTERN = Pattern.compile(
+    "^(127\\.0\\.0\\.1)|(localhost)|(10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})|" +
+    "(172\\.((1[6-9])|(2\\d)|(3[01]))\\.\\d{1,3}\\.\\d{1,3})|" +
+    "(192\\.168\\.\\d{1,3}\\.\\d{1,3})$");
+
 @GetMapping("/openStream")
 public void openStream(@RequestParam String url, HttpServletResponse response) throws IOException {
     InputStream inputStream = null;
     OutputStream outputStream = null;
     try {
-        // Validate URL format and protocol (additional check)
-        if (!isValidUrl(url)) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid URL format or protocol");
+        // Validate URL before using it
+        if (!isUrlSafe(url)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "URL not allowed");
             return;
         }
         
-        // Extract safe filename without path traversal characters
-        URL u = new URL(url);
-        String urlPath = u.getPath();
-        String safeName = FilenameUtils.getName(urlPath); // Safe extraction without path traversal
+        // Get filename safely
+        String downLoadImgFileName = WebUtils.getNameWithoutExtension(url) + "." + WebUtils.getFileExtension(url);
         
-        // Get safe extension and base name
-        String fileExtension = WebUtils.getFileExtension(safeName);
-        String baseName = WebUtils.getNameWithoutExtension(safeName);
-        String downLoadImgFileName = baseName + "." + fileExtension;
+        // Sanitize the filename to prevent header injection
+        downLoadImgFileName = ESAPI.encoder().encodeForHTML(downLoadImgFileName);
         
-        // Set download header with sanitized filename
+        // Set download header
         response.setHeader("content-disposition", "attachment;fileName=" + downLoadImgFileName);
-
+        
+        URL u = new URL(url);
         int length;
         byte[] bytes = new byte[1024];
         inputStream = u.openStream(); // send request
         outputStream = response.getOutputStream();
         while ((length = inputStream.read(bytes)) > 0) {
+            outputStream.write(bytes, 0, length);
+        }
+    } catch (Exception e) {
+        logger.error("Error in openStream: " + e.toString());
+    } finally {
+        if (inputStream != null) {
+            try { inputStream.close(); } catch (IOException e) { logger.error("Error closing input stream: " + e.getMessage()); }
+        }
+        if (outputStream != null) {
+            try { outputStream.close(); } catch (IOException e) { logger.error("Error closing output stream: " + e.getMessage()); }
+        }
+    }
+}
+
+private boolean isUrlSafe(String url) {
+    try {
+        URL u = new URL(url);
+        
+        // Check URL scheme
+        if (!ALLOWED_SCHEMES.contains(u.getProtocol().toLowerCase())) {
+            return false;
+        }
+        
+        // Check if URL points to internal resources
+        String host = u.getHost().toLowerCase();
+        if (IP_PATTERN.matcher(host).matches()) {
+            return false;
+        }
+        
+        // Additional checks can be added here (e.g., domain whitelist)
+        return true;
+    } catch (MalformedURLException e) {
+        return false;
+    }
+}
+
             outputStream.write(bytes, 0, length);
         }
 
