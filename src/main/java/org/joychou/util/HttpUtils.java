@@ -165,15 +165,70 @@ public class HttpUtils {
     }
 
 
-    public static void imageIO(String url) {
-        try {
-            URL u = new URL(url);
-            ImageIO.read(u); // send request
-        } catch (IOException e) {
-            logger.error(e.getMessage());
-        }
-
+public static void imageIO(String url) throws IOException {
+    if (url == null || url.isEmpty()) {
+        throw new IOException("URL cannot be null or empty");
     }
+    
+    URL u;
+    try {
+        u = new URL(url);
+    } catch (MalformedURLException e) {
+        logger.error("Malformed URL: null", url);
+        throw new IOException("Invalid URL format", e);
+    }
+    
+    // Validate URL to prevent SSRF
+    if (!isUrlSafe(u)) {
+        String errorMsg = "SSRF Protection: URL is not allowed: " + url;
+        logger.error(errorMsg);
+        throw new IOException(errorMsg);
+    }
+    
+    try {
+        ImageIO.read(u); // send request
+    } catch (IOException e) {
+        logger.error("Failed to read image from URL: null", url, e);
+        throw e;
+    }
+}
+
+// Helper method to validate if the URL is safe (not pointing to internal resources)
+private static boolean isUrlSafe(URL url) {
+    // Only allow HTTP and HTTPS protocols
+    if (!url.getProtocol().equals("http") && !url.getProtocol().equals("https")) {
+        return false;
+    }
+    
+    String host = url.getHost();
+    try {
+        InetAddress inetAddress = InetAddress.getByName(host);
+        
+        // Block private IP ranges
+        if (inetAddress.isLoopbackAddress() ||       // 127.0.0.1/8
+            inetAddress.isLinkLocalAddress() ||      // 169.254.0.0/16
+            inetAddress.isSiteLocalAddress() ||      // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+            inetAddress.isAnyLocalAddress() ||       // 0.0.0.0/32
+            inetAddress.isMulticastAddress()) {      // 224.0.0.0/4
+            return false;
+        }
+        
+        // Block localhost and variations
+        if (host.equalsIgnoreCase("localhost") ||
+            host.endsWith(".local") ||
+            host.equals("0.0.0.0")) {
+            return false;
+        }
+        
+        // Optional: Implement domain whitelist here
+        // if (!ALLOWED_DOMAINS.contains(host)) return false;
+        
+        return true;
+    } catch (UnknownHostException e) {
+        return false;
+    }
+}
+
 
 
     /**
