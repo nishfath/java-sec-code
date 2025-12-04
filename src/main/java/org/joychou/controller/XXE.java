@@ -326,29 +326,47 @@ public String xmlReaderVuln(HttpServletRequest request) {
     }
 
 
-    @RequestMapping(value = "/DocumentBuilder/xinclude/vuln", method = RequestMethod.POST)
-    public String DocumentBuilderXincludeVuln(HttpServletRequest request) {
-        try {
-            String body = WebUtils.getRequestBody(request);
-            logger.info(body);
+@RequestMapping(value = "/DocumentBuilder/xinclude/vuln", method = RequestMethod.POST)
+public String DocumentBuilderXincludeVuln(HttpServletRequest request) {
+    try {
+        String body = WebUtils.getRequestBody(request);
+        logger.info(body);
 
-            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-            dbf.setXIncludeAware(true);   // 支持XInclude
-            dbf.setNamespaceAware(true);  // 支持XInclude
-            DocumentBuilder db = dbf.newDocumentBuilder();
-            StringReader sr = new StringReader(body);
-            InputSource is = new InputSource(sr);
-            Document document = db.parse(is);  // parse xml
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        
+        // Security fixes to prevent XXE attacks
+        dbf.setXIncludeAware(true);   // Required for XInclude functionality
+        dbf.setNamespaceAware(true);  // Required for XInclude functionality
+        
+        // Disable external entity processing
+        dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        
+        // Set the secure processing feature
+        dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        
+        // Use the FEATURE_SECURE_PROCESSING attribute
+        dbf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        dbf.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        
+        DocumentBuilder db = dbf.newDocumentBuilder();
+        StringReader sr = new StringReader(body);
+        InputSource is = new InputSource(sr);
+        Document document = db.parse(is);  // parse xml
 
-            NodeList rootNodeList = document.getChildNodes();
-            response(rootNodeList);
+        NodeList rootNodeList = document.getChildNodes();
+        response(rootNodeList);
 
-            sr.close();
-            return "DocumentBuilder xinclude xxe vuln code";
-        } catch (Exception e) {
-            logger.error(e.toString());
-            return EXCEPT;
-        }
+        sr.close();
+        return "DocumentBuilder xinclude xxe vuln code";
+    } catch (Exception e) {
+        logger.error(e.toString());
+        return EXCEPT;
+    }
+}
+
     }
 
 
