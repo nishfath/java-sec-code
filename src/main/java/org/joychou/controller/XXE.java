@@ -270,9 +270,53 @@ public String DigesterVuln(HttpServletRequest request) {
 
 
     // 有回显
-    @RequestMapping(value = "/DocumentBuilder/vuln01", method = RequestMethod.POST)
-    public String DocumentBuilderVuln01(HttpServletRequest request) {
-        try {
+@RequestMapping(value = "/DocumentBuilder/vuln01", method = RequestMethod.POST)
+public String DocumentBuilderVuln01(HttpServletRequest request) {
+    try {
+        String body = WebUtils.getRequestBody(request);
+        logger.info(body);
+        
+        // Create a secure DocumentBuilderFactory
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        
+        // Disable XXE processing
+        dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        dbf.setXIncludeAware(false);
+        dbf.setExpandEntityReferences(false);
+        
+        // Set the secure processing feature
+        dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        
+        // Apply the ACCESS_EXTERNAL_DTD and ACCESS_EXTERNAL_SCHEMA properties
+        dbf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        dbf.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        
+        DocumentBuilder db = dbf.newDocumentBuilder();
+        StringReader sr = new StringReader(body);
+        InputSource is = new InputSource(sr);
+        Document document = db.parse(is);  // parse xml
+
+        // Traverse xml nodes name and value
+        StringBuilder buf = new StringBuilder();
+        NodeList rootNodeList = document.getChildNodes();
+        for (int i = 0; i < rootNodeList.getLength(); i++) {
+            Node rootNode = rootNodeList.item(i);
+            NodeList child = rootNode.getChildNodes();
+            for (int j = 0; j < child.getLength(); j++) {
+                Node node = child.item(j);
+                buf.append(String.format("%s: %s\n", node.getNodeName(), node.getTextContent()));
+            }
+        }
+        sr.close();
+        return buf.toString();
+    } catch (Exception e) {
+        logger.error(e.toString());
+        return EXCEPT;
+    }
+}
+
             String body = WebUtils.getRequestBody(request);
             logger.info(body);
             DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
