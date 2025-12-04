@@ -12,16 +12,18 @@ import javax.servlet.http.HttpServletResponse;
 @RequestMapping("/test")
 public class Test {
 
-    @RequestMapping(value = "/")
-    public String Index(HttpServletResponse response, String empId) {
+@RequestMapping(value = "/")
+public String Index(HttpServletResponse response, String empId) {
 
-        System.out.println(empId);
-        Cookie cookie = new Cookie("XSRF-TOKEN", "123");
-        cookie.setDomain("taobao.com");
-        cookie.setMaxAge(-1); // forever time
-        response.addCookie(cookie);
-        return "success";
-    }
+    System.out.println(empId);
+    Cookie cookie = new Cookie("XSRF-TOKEN", "123");
+    cookie.setDomain("taobao.com");
+    cookie.setMaxAge(-1); // forever time
+    cookie.setSecure(true); // Set secure flag to ensure cookie is sent only over HTTPS
+    response.addCookie(cookie);
+    return "success";
+}
+
 
 
     @RequestMapping(value = "/aa")

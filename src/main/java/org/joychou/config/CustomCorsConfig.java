@@ -18,15 +18,17 @@ public class CustomCorsConfig extends WebMvcRegistrationsAdapter {
     @Bean
     public WebMvcConfigurer corsConfigurer() {
         return new WebMvcConfigurerAdapter() {
-            @Override
-            public void addCorsMappings(CorsRegistry registry) {
-                // 为了支持一级域名，重写了checkOrigin
-                //String[] allowOrigins = {"joychou.org", "http://test.joychou.me"};
-                registry.addMapping("/cors/sec/webMvcConfigurer") // /**表示所有路由path
-                        //.allowedOrigins(allowOrigins)
-                        .allowedMethods("GET", "POST")
-                        .allowCredentials(true);
-            }
+@Override
+public void addCorsMappings(CorsRegistry registry) {
+    // Define specific allowed origins to prevent CORS vulnerabilities
+    String[] allowOrigins = {"joychou.org", "http://test.joychou.me"};
+    registry.addMapping("/cors/sec/webMvcConfigurer") // Specify exact path rather than /** for better security
+            .allowedOrigins(allowOrigins)  // Explicitly set allowed origins
+            .allowedMethods("GET", "POST") // Restrict HTTP methods
+            .allowCredentials(true)
+            .maxAge(3600);  // Set how long the results of a preflight request can be cached
+}
+
         };
     }
 
