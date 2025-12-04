@@ -268,30 +268,51 @@ public String xmlReaderVuln(HttpServletRequest request) {
 
 
     // 有回显
-    @RequestMapping(value = "/DocumentBuilder/vuln02", method = RequestMethod.POST)
-    public String DocumentBuilderVuln02(HttpServletRequest request) {
-        try {
-            String body = WebUtils.getRequestBody(request);
-            logger.info(body);
+@RequestMapping(value = "/DocumentBuilder/vuln02", method = RequestMethod.POST)
+public String DocumentBuilderVuln02(HttpServletRequest request) {
+    try {
+        String body = WebUtils.getRequestBody(request);
+        logger.info(body);
 
-            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-            DocumentBuilder db = dbf.newDocumentBuilder();
-            StringReader sr = new StringReader(body);
-            InputSource is = new InputSource(sr);
-            Document document = db.parse(is);  // parse xml
+        // Configure the DocumentBuilderFactory to prevent XXE attacks
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        
+        // Disable DTDs (Document Type Definition)
+        dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        
+        // Alternative: if DTD support is required
+        // dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        // dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        // dbf.setXIncludeAware(false);
+        // dbf.setExpandEntityReferences(false);
+        
+        DocumentBuilder db = dbf.newDocumentBuilder();
+        StringReader sr = new StringReader(body);
+        InputSource is = new InputSource(sr);
+        Document document = db.parse(is);  // parse xml
 
-            // 遍历xml节点name和value
-            StringBuilder result = new StringBuilder();
-            NodeList rootNodeList = document.getChildNodes();
-            for (int i = 0; i < rootNodeList.getLength(); i++) {
-                Node rootNode = rootNodeList.item(i);
-                NodeList child = rootNode.getChildNodes();
-                for (int j = 0; j < child.getLength(); j++) {
-                    Node node = child.item(j);
-                    // 正常解析XML，需要判断是否是ELEMENT_NODE类型。否则会出现多余的的节点。
-                    if (child.item(j).getNodeType() == Node.ELEMENT_NODE) {
-                        result.append(String.format("%s: %s\n", node.getNodeName(), node.getFirstChild()));
-                    }
+        // 遍历xml节点name和value
+        StringBuilder result = new StringBuilder();
+        NodeList rootNodeList = document.getChildNodes();
+        for (int i = 0; i < rootNodeList.getLength(); i++) {
+            Node rootNode = rootNodeList.item(i);
+            NodeList child = rootNode.getChildNodes();
+            for (int j = 0; j < child.getLength(); j++) {
+                Node node = child.item(j);
+                // 正常解析XML，需要判断是否是ELEMENT_NODE类型。否则会出现多余的的节点。
+                if (child.item(j).getNodeType() == Node.ELEMENT_NODE) {
+                    result.append(String.format("%s: %s\n", node.getNodeName(), node.getFirstChild()));
+                }
+            }
+        }
+        sr.close();
+        return result.toString();
+    } catch (Exception e) {
+        logger.error(e.toString());
+        return EXCEPT;
+    }
+}
+
                 }
             }
             sr.close();
