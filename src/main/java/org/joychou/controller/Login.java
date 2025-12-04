@@ -24,31 +24,33 @@ public class Login {
         return "login";
     }
 
-    @GetMapping("/logout")
-    public String logoutPage(HttpServletRequest request, HttpServletResponse response) {
+@GetMapping("/logout")
+public String logoutPage(HttpServletRequest request, HttpServletResponse response) {
 
-        String username = request.getUserPrincipal().getName();
+    String username = request.getUserPrincipal().getName();
 
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null) {
-            new SecurityContextLogoutHandler().logout(request, response, auth);
-        }
-
-        String[] deleteCookieKey = {"JSESSIONID", "remember-me"}; // delete cookie
-        for (String key : deleteCookieKey) {
-            Cookie cookie = new Cookie(key, null);
-            cookie.setMaxAge(0);
-            cookie.setPath("/");
-            response.addCookie(cookie);
-        }
-
-        if (null == request.getUserPrincipal()) {
-            logger.info("USER " + username + " LOGOUT SUCCESS.");
-        } else {
-            logger.info("User " + username + " logout failed. Please try again.");
-        }
-
-        return "redirect:/login?logout";
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth != null) {
+        new SecurityContextLogoutHandler().logout(request, response, auth);
     }
+
+    String[] deleteCookieKey = {"JSESSIONID", "remember-me"}; // delete cookie
+    for (String key : deleteCookieKey) {
+        Cookie cookie = new Cookie(key, null);
+        cookie.setMaxAge(0);
+        cookie.setPath("/");
+        cookie.setSecure(true); // Set the Secure flag to ensure cookies are only sent over HTTPS
+        response.addCookie(cookie);
+    }
+
+    if (null == request.getUserPrincipal()) {
+        logger.info("USER " + username + " LOGOUT SUCCESS.");
+    } else {
+        logger.info("User " + username + " logout failed. Please try again.");
+    }
+
+    return "redirect:/login?logout";
+}
+
 
 }
