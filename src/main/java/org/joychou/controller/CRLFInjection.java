@@ -17,13 +17,15 @@ import javax.servlet.http.HttpServletResponse;
 @RequestMapping("/crlf")
 public class CRLFInjection {
 
-    @RequestMapping("/safecode")
-    @ResponseBody
-    public void crlf(HttpServletRequest request, HttpServletResponse response) {
-        response.addHeader("test1", request.getParameter("test1"));
-        response.setHeader("test2", request.getParameter("test2"));
-        String author = request.getParameter("test3");
-        Cookie cookie = new Cookie("test3", author);
-        response.addCookie(cookie);
-    }
+@RequestMapping("/safecode")
+@ResponseBody
+public void crlf(HttpServletRequest request, HttpServletResponse response) {
+    response.addHeader("test1", request.getParameter("test1"));
+    response.setHeader("test2", request.getParameter("test2"));
+    String author = request.getParameter("test3");
+    Cookie cookie = new Cookie("test3", author);
+    cookie.setSecure(true);  // Set the Secure flag to ensure cookie is only sent over HTTPS
+    response.addCookie(cookie);
+}
+
 }
