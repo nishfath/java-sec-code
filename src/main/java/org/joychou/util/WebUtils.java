@@ -35,12 +35,13 @@ public class WebUtils {
     }
 
 
-    public static String getFileExtension(String fullName) {
-        Preconditions.checkNotNull(fullName);
-        String fileName = (new File(fullName)).getName();
-        int dotIndex = fileName.lastIndexOf('.');
-        return dotIndex == -1 ? "" : fileName.substring(dotIndex + 1);
-    }
+public static String getFileExtension(String fullName) {
+    Preconditions.checkNotNull(fullName);
+    
+    // Use FilenameUtils to safely get extension without path traversal issues
+    return FilenameUtils.getExtension(fullName);
+}
+
 
 
     public static String getNameWithoutExtension(String file) {
